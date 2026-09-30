@@ -1,0 +1,18 @@
+<section class="glass-panel rounded-[2rem] p-7 text-center sm:p-10" aria-labelledby="logout-title">
+  <div class="brand-mark mx-auto mb-6 flex size-14 items-center justify-center rounded-2xl text-teal-800" aria-hidden="true">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M9 5H5v14h4m5-14 7 7-7 7m-6-7h13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg>
+  </div>
+  <p class="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-teal-800">Until next time</p>
+  <div aria-live="polite" aria-atomic="true">
+    <h1 id="logout-title" class="text-4xl font-semibold tracking-tight text-slate-900">{{ loggedOut() ? 'See you soon.' : 'Ready to leave?' }}</h1>
+    <p class="mt-3 text-sm leading-6 text-slate-600">{{ loggedOut() ? 'You’ve finished the preview. You can return to the login page whenever you like.' : 'Take a break. We’ll be here when you’re ready to return.' }}</p>
+  </div>
+  <div class="mt-8">
+    @if (loggedOut()) {
+      <button type="button" class="submit-button glass-button" (click)="loginRequested.emit()">Back to login</button>
+    } @else {
+      <button type="button" class="submit-button glass-button" (click)="loggedOut.set(true)">Log out <span aria-hidden="true">→</span></button>
+    }
+  </div>
+  <p class="mt-5 text-xs leading-5 text-slate-600">UI preview only. No account session is active.</p>
+</section>

@@ -1,0 +1,124 @@
+@import 'tailwindcss';
+
+html {
+  color-scheme: light;
+  font-family: 'Inter', 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+}
+
+button, input, textarea {
+  font: inherit;
+}
+
+::selection {
+  background: #b6dcd3;
+  color: #163d39;
+}
+
+.glass-page {
+  background: radial-gradient(ellipse at 15% 15%, #d3ece8 0%, transparent 50%),
+    radial-gradient(ellipse at 90% 85%, #d7d9f2 0%, transparent 50%), #edf1ee;
+}
+
+.ambient {
+  position: absolute;
+  z-index: -1;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.ambient-one {
+  width: 27rem;
+  height: 27rem;
+  top: -7rem;
+  right: -6rem;
+  background: linear-gradient(140deg, #b9d8e7, #d8d3eb 65%, #eef0f8);
+  box-shadow: inset 12px 18px 35px #ffffffa6, 0 30px 70px #899cbb20;
+}
+
+.ambient-two {
+  width: 19rem;
+  height: 19rem;
+  bottom: -5rem;
+  left: -6rem;
+  background: linear-gradient(145deg, #cee5cf, #8fbfb4);
+  box-shadow: inset 10px 15px 35px #ffffff90, 0 20px 80px #638d8430;
+}
+
+.ambient-three {
+  width: 12rem;
+  height: 12rem;
+  top: 42%;
+  left: calc(50% - 20rem);
+  background: linear-gradient(140deg, #f4e9dc, #e5cbbd);
+  filter: blur(3px);
+}
+
+.glass-panel {
+  background: linear-gradient(135deg, #ffffffb3, #ffffff59);
+  border: 1px solid #ffffffd9;
+  backdrop-filter: blur(28px) saturate(130%);
+  -webkit-backdrop-filter: blur(28px) saturate(130%);
+  box-shadow: 0 24px 80px -25px #3c596f40, inset 0 1px 0 #fff,
+    inset 0 -1px 0 #ffffff80;
+}
+
+.brand-mark {
+  background: #ffffff80;
+  border: 1px solid #ffffffcc;
+  box-shadow: 0 3px 10px #426a6410;
+}
+
+.glass-input {
+  color: #0f172a;
+  background: #ffffff66;
+  border: 1px solid #ffffffd9;
+  box-shadow: inset 0 2px 5px #35596c05, 0 2px 4px #35596c03;
+  transition: background 180ms, box-shadow 180ms, border-color 180ms;
+}
+
+.glass-input::placeholder {
+  color: #64748b;
+}
+
+.glass-input:focus {
+  outline: none;
+  border-color: #427e79;
+  background: #ffffffa6;
+  box-shadow: 0 0 0 3px #427e7926;
+}
+
+.glass-input[aria-invalid='true'] {
+  border-color: #9f1239;
+}
+
+.submit-button {
+  background: linear-gradient(160deg, #387f79, #245e5b);
+  border: 1px solid #286b66;
+  box-shadow: inset 0 1px 0 #ffffff40, 0 6px 16px #245e5b26;
+}
+
+.submit-button:hover {
+  background: linear-gradient(160deg, #2e706a, #194e4b);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .glass-input {
+    transition: none;
+  }
+}
+
+@layer components {
+  .glass-button {
+    @apply flex w-full cursor-pointer items-center justify-center gap-3 rounded-2xl px-5 py-4 text-sm font-semibold text-white transition duration-200 hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-teal-800 active:translate-y-0 motion-reduce:transform-none motion-reduce:transition-none;
+  }
+
+  .glass-link {
+    @apply cursor-pointer rounded-lg px-3 py-2 text-sm font-medium text-teal-900 hover:bg-white/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-800;
+  }
+}

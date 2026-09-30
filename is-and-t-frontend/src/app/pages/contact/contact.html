@@ -1,0 +1,40 @@
+    <section class="glass-panel rounded-[2rem] p-7 sm:p-10" aria-labelledby="form-title">
+      <div class="mb-8">
+        <p class="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-teal-800">A little hello goes a long way</p>
+        <h1 id="form-title" class="text-4xl font-semibold tracking-tight text-slate-900">Let’s connect.</h1>
+        <p class="mt-3 text-sm leading-6 text-slate-600">Have a question or an idea? We’d love to hear it.</p>
+      </div>
+
+      <form #contactForm="ngForm" (ngSubmit)="submit(contactForm)" class="space-y-5" novalidate>
+        <div>
+          <label for="name" class="mb-2 block text-sm font-medium text-slate-700">Full name</label>
+          <input id="name" name="name" ngModel #name="ngModel" required pattern=".*\S.*" autocomplete="name" placeholder="Alex Morgan" class="glass-input w-full rounded-2xl px-4 py-3.5 text-sm" [attr.aria-invalid]="name.invalid && (name.touched || contactForm.submitted)" [attr.aria-describedby]="name.invalid && (name.touched || contactForm.submitted) ? 'name-error' : null" />
+          @if (name.invalid && (name.touched || contactForm.submitted)) {
+            <p id="name-error" class="mt-2 text-xs text-rose-800">Please enter your name.</p>
+          }
+        </div>
+
+        <div>
+          <label for="email" class="mb-2 block text-sm font-medium text-slate-700">Email address</label>
+          <input id="email" name="email" type="email" ngModel #email="ngModel" required email autocomplete="email" placeholder="alex@example.com" class="glass-input w-full rounded-2xl px-4 py-3.5 text-sm" [attr.aria-invalid]="email.invalid && (email.touched || contactForm.submitted)" [attr.aria-describedby]="email.invalid && (email.touched || contactForm.submitted) ? 'email-error' : null" />
+          @if (email.invalid && (email.touched || contactForm.submitted)) {
+            <p id="email-error" class="mt-2 text-xs text-rose-800">Please enter a valid email address.</p>
+          }
+        </div>
+
+        <div>
+          <label for="message" class="mb-2 block text-sm font-medium text-slate-700">Your message <span class="font-normal text-slate-500">(optional)</span></label>
+          <textarea id="message" name="message" ngModel rows="4" placeholder="What’s on your mind?" class="glass-input min-h-28 w-full resize-y rounded-2xl px-4 py-3.5 text-sm"></textarea>
+        </div>
+
+        <button type="submit" class="submit-button flex w-full cursor-pointer items-center justify-center gap-3 rounded-2xl px-5 py-4 text-sm font-semibold text-white transition duration-200 hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-teal-800 active:translate-y-0 motion-reduce:transform-none motion-reduce:transition-none">
+          Submit message
+          <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M5 12h14m-6-6 6 6-6 6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        </button>
+        <div role="status" aria-live="polite">
+          @if (submitted()) {
+            <p class="rounded-xl border border-teal-800/15 bg-white/50 p-3 text-sm leading-6 text-teal-900">Your form was submitted locally. Delivery will be available once a backend is connected.</p>
+          }
+        </div>
+      </form>
+    </section>

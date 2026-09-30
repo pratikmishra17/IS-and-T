@@ -1,0 +1,18 @@
+<app-page-shell>
+  <nav aria-label="Page previews" class="mb-5 flex flex-wrap justify-center gap-2">
+    <button type="button" class="glass-link" [attr.aria-current]="page() === 'login' ? 'page' : null" [class.bg-white/60]="page() === 'login'" (click)="page.set('login')">Log in</button>
+    <button type="button" class="glass-link" [attr.aria-current]="page() === 'logout' ? 'page' : null" [class.bg-white/60]="page() === 'logout'" (click)="page.set('logout')">Log out</button>
+    <button type="button" class="glass-link" [attr.aria-current]="page() === 'contact' ? 'page' : null" [class.bg-white/60]="page() === 'contact'" (click)="page.set('contact')">Contact</button>
+  </nav>
+  @switch (page()) {
+    @case ('login') {
+      <app-login (loggedIn)="page.set('logout')" />
+    }
+    @case ('logout') {
+      <app-logout (loginRequested)="page.set('login')" />
+    }
+    @case ('contact') {
+      <app-contact />
+    }
+  }
+</app-page-shell>
