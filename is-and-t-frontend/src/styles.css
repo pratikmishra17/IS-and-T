@@ -25,40 +25,6 @@ button, input, textarea {
     radial-gradient(ellipse at 90% 85%, #d7d9f2 0%, transparent 50%), #edf1ee;
 }
 
-.ambient {
-  position: absolute;
-  z-index: -1;
-  border-radius: 50%;
-  pointer-events: none;
-}
-
-.ambient-one {
-  width: 27rem;
-  height: 27rem;
-  top: -7rem;
-  right: -6rem;
-  background: linear-gradient(140deg, #b9d8e7, #d8d3eb 65%, #eef0f8);
-  box-shadow: inset 12px 18px 35px #ffffffa6, 0 30px 70px #899cbb20;
-}
-
-.ambient-two {
-  width: 19rem;
-  height: 19rem;
-  bottom: -5rem;
-  left: -6rem;
-  background: linear-gradient(145deg, #cee5cf, #8fbfb4);
-  box-shadow: inset 10px 15px 35px #ffffff90, 0 20px 80px #638d8430;
-}
-
-.ambient-three {
-  width: 12rem;
-  height: 12rem;
-  top: 42%;
-  left: calc(50% - 20rem);
-  background: linear-gradient(140deg, #f4e9dc, #e5cbbd);
-  filter: blur(3px);
-}
-
 .glass-panel {
   background: linear-gradient(135deg, #ffffffb3, #ffffff59);
   border: 1px solid #ffffffd9;

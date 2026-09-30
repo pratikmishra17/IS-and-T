@@ -1,12 +1,33 @@
 <app-page-shell>
-  <nav aria-label="Page previews" class="mb-5 flex flex-wrap justify-center gap-2">
-    <button type="button" class="glass-link" [attr.aria-current]="page() === 'login' ? 'page' : null" [class.bg-white/60]="page() === 'login'" (click)="page.set('login')">Log in</button>
-    <button type="button" class="glass-link" [attr.aria-current]="page() === 'logout' ? 'page' : null" [class.bg-white/60]="page() === 'logout'" (click)="page.set('logout')">Log out</button>
-    <button type="button" class="glass-link" [attr.aria-current]="page() === 'contact' ? 'page' : null" [class.bg-white/60]="page() === 'contact'" (click)="page.set('contact')">Contact</button>
-  </nav>
+  <app-navbar [activePage]="page()" (navigate)="page.set($event)" />
   @switch (page()) {
+    @case ('account') {
+      <app-account />
+    }
+    @case ('home') {
+      <section class="glass-panel rounded-[2rem] p-7 sm:p-10" aria-labelledby="home-title">
+        <p class="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-teal-800">Everything in one place</p>
+        <h1 id="home-title" class="text-4xl font-semibold tracking-tight text-slate-900">Welcome home.</h1>
+        <p class="mt-3 text-sm leading-6 text-slate-600">Explore your schedule, check inventory, or manage your account using the menu above.</p>
+        <button type="button" class="glass-link mt-6" (click)="page.set('contact')">Get in touch <span aria-hidden="true">→</span></button>
+      </section>
+    }
+    @case ('schedule') {
+      <section class="glass-panel rounded-[2rem] p-7 sm:p-10" aria-labelledby="schedule-title">
+        <p class="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-teal-800">Plan your day</p>
+        <h1 id="schedule-title" class="text-4xl font-semibold tracking-tight text-slate-900">Schedule.</h1>
+        <p class="mt-3 text-sm leading-6 text-slate-600">Your upcoming events will appear here once scheduling is connected.</p>
+      </section>
+    }
+    @case ('inventory') {
+      <section class="glass-panel rounded-[2rem] p-7 sm:p-10" aria-labelledby="inventory-title">
+        <p class="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-teal-800">Keep things organized</p>
+        <h1 id="inventory-title" class="text-4xl font-semibold tracking-tight text-slate-900">Inventory.</h1>
+        <p class="mt-3 text-sm leading-6 text-slate-600">Your items will appear here once an inventory source is connected.</p>
+      </section>
+    }
     @case ('login') {
-      <app-login (loggedIn)="page.set('logout')" />
+      <app-login (loggedIn)="page.set('home')" />
     }
     @case ('logout') {
       <app-logout (loginRequested)="page.set('login')" />

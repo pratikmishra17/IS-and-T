@@ -1,0 +1,20 @@
+<section class="glass-panel rounded-[2rem] p-7 sm:p-10" aria-labelledby="account-title">
+  <p class="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-teal-800">Make it yours</p>
+  <h1 id="account-title" class="text-4xl font-semibold tracking-tight text-slate-900">Your account.</h1>
+  <p class="mt-3 text-sm leading-6 text-slate-600">Manage your profile details.</p>
+  <form #accountForm="ngForm" (ngSubmit)="save(accountForm)" (input)="saved.set(false)" class="mt-8 space-y-5" novalidate>
+    <div>
+      <label for="account-name" class="mb-2 block text-sm font-medium text-slate-700">Full name</label>
+      <input id="account-name" name="name" ngModel #name="ngModel" required pattern=".*\S.*" autocomplete="name" placeholder="Alex Morgan" class="glass-input w-full rounded-2xl px-4 py-3.5 text-sm" [attr.aria-invalid]="name.invalid && (name.touched || accountForm.submitted)" aria-describedby="account-name-error" />
+      <p id="account-name-error" class="mt-2 text-xs text-rose-800">@if (name.invalid && (name.touched || accountForm.submitted)) { Please enter your name. }</p>
+    </div>
+    <div>
+      <label for="account-email" class="mb-2 block text-sm font-medium text-slate-700">Email address</label>
+      <input id="account-email" name="email" type="email" ngModel #email="ngModel" required email autocomplete="email" placeholder="alex@example.com" class="glass-input w-full rounded-2xl px-4 py-3.5 text-sm" [attr.aria-invalid]="email.invalid && (email.touched || accountForm.submitted)" aria-describedby="account-email-error" />
+      <p id="account-email-error" class="mt-2 text-xs text-rose-800">@if (email.invalid && (email.touched || accountForm.submitted)) { Please enter a valid email address. }</p>
+    </div>
+    <button type="submit" class="submit-button glass-button">Preview changes</button>
+    <p class="text-xs leading-5 text-slate-600">Preview only. Details are not saved and will clear when you leave this page.</p>
+    <p role="status" class="text-sm text-teal-900">@if (saved()) { Your profile details are valid. Saving will be available when accounts are connected. }</p>
+  </form>
+</section>

@@ -1,0 +1,28 @@
+<header class="glass-panel mx-auto grid max-w-6xl grid-cols-[1fr_auto] items-center gap-y-4 rounded-3xl px-4 py-3 sm:grid-cols-[1fr_auto_1fr] sm:px-6">
+  <button type="button" class="glass-link flex w-fit items-center gap-2.5" aria-label="IS and T home" (click)="select('home')">
+    <span class="brand-mark flex size-9 items-center justify-center rounded-xl" aria-hidden="true">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="m12 3 9 5-9 5-9-5 9-5Zm-9 9 9 5 9-5M3 16l9 5 9-5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></svg>
+    </span>
+    <span class="font-semibold tracking-wide">IS &amp; T</span>
+  </button>
+
+  <nav aria-label="Main navigation" class="col-span-2 row-start-2 flex justify-center gap-1 rounded-2xl border border-white/60 bg-white/25 p-1 sm:col-span-1 sm:col-start-2 sm:row-start-1">
+    @for (section of sections; track section) {
+      <button type="button" class="glass-link px-4 capitalize" [class.bg-white/60]="activePage() === section" [attr.aria-current]="activePage() === section ? 'page' : null" (click)="select(section)">{{ section }}</button>
+    }
+  </nav>
+
+  <div #profile class="relative col-start-2 row-start-1 justify-self-end sm:col-start-3" (focusout)="closeOnFocusOut($event)">
+    <button #profileButton type="button" class="glass-link brand-mark flex size-11 items-center justify-center rounded-full p-0" aria-label="User profile" aria-controls="profile-actions" [attr.aria-expanded]="profileOpen()" (click)="profileOpen.set(!profileOpen())">
+      <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.5" stroke="currentColor" stroke-width="1.6" /><path d="M5 21v-2a7 7 0 0 1 14 0v2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg>
+    </button>
+    @if (profileOpen()) {
+      <div id="profile-actions" class="absolute right-0 top-full z-30 mt-3 w-56 rounded-2xl border border-white bg-[#eef4f1]/95 p-2 shadow-xl backdrop-blur-xl">
+        <p class="px-3 py-2 text-xs font-semibold uppercase tracking-widest text-slate-500">Your account</p>
+        <button type="button" class="glass-link block w-full text-left" (click)="select('account')">Manage account</button>
+        <div class="my-1 border-t border-slate-200/70"></div>
+        <button type="button" class="glass-link block w-full text-left" (click)="select('logout')">Log out <span aria-hidden="true" class="float-right">→</span></button>
+      </div>
+    }
+  </div>
+</header>

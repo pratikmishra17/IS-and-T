@@ -42,6 +42,12 @@ describe('App', () => {
     await fixture.whenStable();
     submit();
     await fixture.whenStable();
+    expect(page.querySelector('h1')?.textContent).toContain('Welcome home.');
+    page.querySelector<HTMLButtonElement>('[aria-label="User profile"]')!.click();
+    await fixture.whenStable();
+    const actions = page.querySelectorAll<HTMLButtonElement>('#profile-actions button');
+    actions[1].click();
+    await fixture.whenStable();
     expect(page.querySelector('h1')?.textContent).toContain('Ready to leave?');
     expect(page.querySelector('input[type="password"]')).toBeNull();
 
@@ -52,6 +58,32 @@ describe('App', () => {
     await fixture.whenStable();
     expect(page.querySelector('h1')?.textContent).toContain('Welcome back.');
     expect(page.querySelector<HTMLInputElement>('#login-password')!.value).toBe('');
+  });
+
+  it('navigates sections and opens account management from the profile dropdown', async () => {
+    const fixture = TestBed.createComponent(App);
+    await fixture.whenStable();
+    const page = fixture.nativeElement as HTMLElement;
+    const links = page.querySelectorAll<HTMLButtonElement>('nav[aria-label="Main navigation"] button');
+    for (const [index, title] of ['Welcome home.', 'Schedule.', 'Inventory.'].entries()) {
+      links[index].click();
+      await fixture.whenStable();
+      expect(page.querySelector('h1')?.textContent).toContain(title);
+      expect(links[index].getAttribute('aria-current')).toBe('page');
+    }
+    const profile = page.querySelector<HTMLButtonElement>('[aria-label="User profile"]')!;
+    profile.click();
+    await fixture.whenStable();
+    expect(profile.getAttribute('aria-expanded')).toBe('true');
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    await fixture.whenStable();
+    expect(profile.getAttribute('aria-expanded')).toBe('false');
+    profile.click();
+    await fixture.whenStable();
+    page.querySelector<HTMLButtonElement>('#profile-actions button')!.click();
+    await fixture.whenStable();
+    expect(page.querySelector('h1')?.textContent).toContain('Your account.');
+    expect(page.querySelector('#profile-actions')).toBeNull();
   });
 
 });
