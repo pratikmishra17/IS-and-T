@@ -18,7 +18,7 @@
         <button type="button" class="glass-link absolute right-2 top-1/2 -translate-y-1/2" (click)="showPassword.set(!showPassword())" [attr.aria-label]="showPassword() ? 'Hide password' : 'Show password'" [attr.aria-pressed]="showPassword()" aria-controls="login-password">{{ showPassword() ? 'Hide' : 'Show' }}</button>
       </div>
       @if (password.invalid && (password.touched || loginForm.submitted)) {
-        <p id="login-password-error" class="mt-2 text-xs text-rose-800">Please enter your password.</p>
+        <p id="login-password-error" class="mt-2 text-xs text-rose-800">Please enter your password. hi</p>
       }
     </div>
     <button type="submit" class="submit-button glass-button">Log in <span aria-hidden="true">→</span></button>
