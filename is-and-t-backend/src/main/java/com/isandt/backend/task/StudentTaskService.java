@@ -60,12 +60,26 @@ public class StudentTaskService {
 		Instant today = LocalDate.now(clock).atStartOfDay(zone).toInstant();
 		List<TaskResponse> upcoming = tasks.findForStudent(student, List.of(TaskStatus.ASSIGNED), today).stream()
 				.map(workflow::describe).toList();
-		List<TaskResponse> available = tasks.findUnassignedFrom(today).stream().map(workflow::describe).toList();
+		List<Task> unassigned = tasks.findUnassignedFrom(today);
+		List<TaskResponse> available = unassigned.stream().map(workflow::describe).toList();
+		List<Long> duringMyShifts = unassigned.stream().filter(task -> assigner.isOnShiftForWholeTask(student, task))
+				.map(Task::getId).toList();
 		List<TaskResponse> recent = tasks.findForStudent(student, List.of(TaskStatus.COMPLETED, TaskStatus.NOT_COMPLETED),
 				today.minusSeconds(14L * 24 * 3600)).stream()
 				.sorted(Comparator.comparing(Task::getStartAt).reversed())
 				.map(workflow::describe).toList();
-		return new MyTasks(upcoming, available, recent);
+		return new MyTasks(upcoming, available, duringMyShifts, recent);
+	}
+
+	/** The student's tasks (assigned or finished, not cancelled) starting from..to, campus dates, in time order. */
+	@Transactional(readOnly = true)
+	public List<TaskResponse> tasksBetween(Long studentId, LocalDate from, LocalDate to) {
+		return tasks.findForStudent(student(studentId),
+				List.of(TaskStatus.ASSIGNED, TaskStatus.COMPLETED, TaskStatus.NOT_COMPLETED), from.atStartOfDay(zone).toInstant())
+				.stream()
+				.filter(task -> task.getStartAt().isBefore(to.plusDays(1).atStartOfDay(zone).toInstant()))
+				.map(workflow::describe)
+				.toList();
 	}
 
 	/**

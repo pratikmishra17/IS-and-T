@@ -8,7 +8,7 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
-/** A one-off change: a day off (CANCEL, no times) or an extra shift (EXTRA, with times). */
+/** A one-off change: a day off (CANCEL, no times), an extra shift (EXTRA) or part of a day off (OFF), both with times. */
 public record ExceptionRequest(
 		@NotNull LocalDate date,
 		@NotNull ShiftExceptionType type,

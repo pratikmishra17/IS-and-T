@@ -60,7 +60,8 @@ public final class ScheduleResponses {
 	public record StudentWeek(Long studentId, String name, List<StudentDay> days, double hours, boolean overLimit) {
 	}
 
-	public record StudentDay(LocalDate date, List<WeekShift> shifts, boolean cancelled) {
+	/** timeOff: approved time off for part of the day (already cut out of shifts). */
+	public record StudentDay(LocalDate date, List<WeekShift> shifts, boolean cancelled, List<WeekShift> timeOff) {
 	}
 
 	public record WeekShift(@JsonFormat(pattern = "HH:mm") LocalTime start, @JsonFormat(pattern = "HH:mm") LocalTime end,

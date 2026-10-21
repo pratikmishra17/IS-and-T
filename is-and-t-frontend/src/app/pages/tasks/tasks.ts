@@ -1,5 +1,5 @@
 import { DatePipe, NgTemplateOutlet } from '@angular/common';
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { errorMessage } from '../../services/errors';
 import { MyTaskApi, MyTasks, Task } from '../../services/tasks';
@@ -23,6 +23,34 @@ export class Tasks implements OnInit {
 
   protected readonly tasks = signal<MyTasks | null>(null);
   protected readonly busyId = signal<number | null>(null);
+  /** Task ids whose details are expanded. */
+  protected readonly expanded = signal(new Set<number>());
+  protected readonly onlyMyShifts = signal(true);
+  protected readonly today = new Date().toLocaleDateString('en-CA');
+
+  /** Your tasks under "Today", "Tomorrow" and one heading per later day. */
+  protected readonly upcomingByDay = computed(() => {
+    const groups: { date: string; tasks: Task[] }[] = [];
+    for (const task of this.tasks()?.upcoming ?? []) {
+      const last = groups.at(-1);
+      if (last?.date === task.date) {
+        last.tasks.push(task);
+      } else {
+        groups.push({ date: task.date, tasks: [task] });
+      }
+    }
+    return groups;
+  });
+
+  protected readonly available = computed(() => {
+    const all = this.tasks();
+    if (!all) {
+      return [];
+    }
+    const mine = new Set(all.availableDuringMyShifts);
+    return this.onlyMyShifts() ? all.available.filter((task) => mine.has(task.id)) : all.available;
+  });
+  protected readonly hiddenAvailable = computed(() => (this.tasks()?.available.length ?? 0) - this.available().length);
 
   // One panel at a time: finishing a task (done or not) or handing it off.
   protected readonly panel = signal<{ mode: 'complete' | 'not-completed' | 'hand-off'; task: Task } | null>(null);
@@ -34,6 +62,20 @@ export class Tasks implements OnInit {
 
   async ngOnInit(): Promise<void> {
     await this.reload();
+  }
+
+  protected dayLabel(date: string): string {
+    const tomorrow = new Date(`${this.today}T12:00:00`);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return date === this.today ? 'Today' : date === tomorrow.toLocaleDateString('en-CA') ? 'Tomorrow' : '';
+  }
+
+  protected toggle(task: Task): void {
+    const next = new Set(this.expanded());
+    if (!next.delete(task.id)) {
+      next.add(task.id);
+    }
+    this.expanded.set(next);
   }
 
   protected openComplete(task: Task): void {

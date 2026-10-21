@@ -288,6 +288,22 @@ The admin side is built first; student pages only where the admin side can't wor
 | 6 | Tasks: week board, list, create/edit/reschedule/cancel, auto-assignment, manual assignment, item reservations, history, backorders and follow-ups; student Tasks page (claim, opt out, hand off, complete, couldn't complete) | ✅ |
 | 7 | Settings (digest time and recipients, default task length) and the weekday digest email (scheduled job, "send now") | ✅ |
 
+## 7c. User (student) portal build (agreed Oct 2026)
+
+Phone-first: students use it between buildings.
+
+| Item | Contents | Status |
+|---|---|---|
+| A | Layout: phone tab bar (Home, Tasks, Schedule, More), wider pages for Tasks/Schedule, shared notices and dialogs | ✅ |
+| B | Home "my day": next task with countdown, today's shifts and tasks, week hours vs limit, up for grabs, hours request status | ✅ |
+| C | Tasks: grouped by day, expandable details (tap to call/email, items to pick up), "only during my shifts" filter | ✅ |
+| D | Schedule: My week view; hours by week for the semester | ✅ |
+| E | My account (name, password) shared with the admin portal | ✅ |
+| F1 | Time off: students ask for a whole day, one shift or some hours; admins approve/decline; on approval, tasks in that time go to someone free and on shift, and any nobody can take become unassigned and are reported to the admin | ✅ |
+| F2 | Inventory: read-only stock lookup for students (what's free, which room) | ✅ |
+| F3 | Contact page removed | ✅ |
+| F4 | Calendar subscription: private .ics link per student (shifts and tasks, 2 weeks back to 8 ahead), regenerate to revoke | ✅ |
+
 ## 8. Open questions
 
 1. **Which managers receive the daily digest?** To be decided; it's a setting, so it can be changed at any time.

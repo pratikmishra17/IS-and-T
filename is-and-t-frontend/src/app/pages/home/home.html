@@ -1,6 +1,88 @@
-<section class="glass-panel rounded-[2rem] p-7 sm:p-10" aria-labelledby="home-title">
-  <p class="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-teal-800">Everything in one place</p>
-  <h1 id="home-title" class="text-4xl font-semibold tracking-tight text-slate-900">Welcome, {{ auth.currentUser()?.firstName }}.</h1>
-  <p class="mt-3 text-sm leading-6 text-slate-600">Explore your schedule, check inventory, or manage your account using the menu above.</p>
-  <a routerLink="/contact" class="glass-link mt-6 inline-block">Get in touch <span aria-hidden="true">→</span></a>
-</section>
+@if (auth.isAdmin()) {
+  <section class="glass-panel mx-auto max-w-lg rounded-[2rem] p-7 sm:p-10" aria-labelledby="home-title">
+    <h1 id="home-title" class="text-4xl font-semibold tracking-tight text-slate-900">Welcome, {{ auth.currentUser()?.firstName }}.</h1>
+    <p class="mt-3 text-sm leading-6 text-slate-600">Schedules, tasks, inventory and users are managed in the admin portal.</p>
+    <a routerLink="/admin" class="btn submit-button mt-6 text-white">Open the admin portal <span aria-hidden="true">→</span></a>
+  </section>
+} @else {
+  <div class="mx-auto max-w-3xl">
+    <p class="text-sm font-medium text-teal-800">{{ now() | date: 'EEEE, MMMM d' }}</p>
+    <h1 class="mt-1 text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">{{ greeting() }}, {{ auth.currentUser()?.firstName }}.</h1>
+
+    @if (error()) {
+      <p role="alert" class="mt-6 rounded-2xl bg-rose-50/80 px-4 py-3 text-sm text-rose-900">{{ error() }}</p>
+    } @else if (!day()) {
+      <p class="mt-6 text-sm text-slate-600">Loading…</p>
+    } @else {
+      @if (day()!.holiday) { <p class="mt-4 rounded-2xl bg-rose-50/80 px-4 py-3 text-sm text-rose-950">Today is a holiday: {{ day()!.holiday }}.</p> }
+      @if (day()!.dayOff) { <p class="mt-4 rounded-2xl bg-white/60 px-4 py-3 text-sm text-slate-700">You have the day off today.</p> }
+
+      <!-- Next up -->
+      @if (nextTask(); as task) {
+        <a routerLink="/tasks" class="glass-panel mt-5 block rounded-3xl p-5 hover:bg-white/70">
+          <p class="text-xs font-semibold uppercase tracking-widest text-teal-800">Next up · {{ startsIn(task) }}</p>
+          <p class="mt-1 text-lg font-semibold text-slate-900">{{ task.title }}</p>
+          <p class="text-sm text-slate-600">{{ task.startTime }}–{{ task.endTime }} · {{ task.building }} {{ task.room }} · {{ task.employee.name }}</p>
+          @if (task.items.length > 0) {
+            <p class="mt-2 text-sm text-slate-700">Pick up: @for (item of task.items; track item.id) { {{ item.quantityPlanned }} × {{ item.itemName }} ({{ item.locationLabel }})@if (!$last) {, } }</p>
+          }
+        </a>
+      }
+
+      <div class="mt-4 grid gap-4 sm:grid-cols-[3fr_2fr]">
+        <!-- Today -->
+        <section class="glass-panel rounded-3xl p-5" aria-labelledby="today-title">
+          <h2 id="today-title" class="font-semibold text-slate-900">Today</h2>
+          @if (timeline().length === 0) {
+            <p class="mt-2 text-sm text-slate-500">No shifts or tasks today.</p>
+          }
+          <ol class="mt-3 space-y-2">
+            @for (entry of timeline(); track $index) {
+              <li class="flex gap-3">
+                <span class="w-12 shrink-0 pt-0.5 text-right text-sm font-semibold text-slate-700">{{ entry.start }}</span>
+                <div class="min-w-0 flex-1 rounded-2xl px-3 py-2 text-sm" [class]="entry.kind === 'shift' ? 'bg-teal-100/70 text-teal-950' : 'border border-white/80 bg-white/70 text-slate-800'">
+                  <p class="font-medium">{{ entry.label }} <span class="font-normal text-slate-500">until {{ entry.end }}</span></p>
+                  @if (entry.detail) { <p class="text-xs text-slate-600">{{ entry.detail }}@if (entry.task?.status === 'COMPLETED') { · done } </p> }
+                </div>
+              </li>
+            }
+          </ol>
+        </section>
+
+        <div class="flex flex-col gap-4">
+          <!-- This week -->
+          <a routerLink="/schedule" class="glass-panel block rounded-3xl p-5 hover:bg-white/70" aria-labelledby="week-title">
+            <h2 id="week-title" class="font-semibold text-slate-900">This week</h2>
+            <p class="mt-1 text-2xl font-semibold text-slate-900">{{ day()!.weekHours }} h@if (day()!.weeklyHourLimit) { <span class="text-base font-normal text-slate-500"> of {{ day()!.weeklyHourLimit }}</span> }</p>
+            @if (day()!.weeklyHourLimit) {
+              <div class="mt-2 h-2 rounded-full bg-slate-200/80" role="progressbar" [attr.aria-valuenow]="day()!.weekHours" aria-valuemin="0" [attr.aria-valuemax]="day()!.weeklyHourLimit" aria-label="Hours this week">
+                <div class="h-2 rounded-full bg-teal-700" [style.width.%]="weekPercent()"></div>
+              </div>
+              <p class="mt-1 text-xs text-slate-500">{{ day()!.semesterName }}</p>
+            }
+          </a>
+
+          <!-- Up for grabs -->
+          <a routerLink="/tasks" class="glass-panel block rounded-3xl p-5 hover:bg-white/70">
+            <h2 class="font-semibold text-slate-900">Up for grabs today</h2>
+            <p class="mt-1 text-sm" [class.text-amber-800]="day()!.upForGrabsToday > 0" [class.text-slate-500]="day()!.upForGrabsToday === 0">
+              {{ day()!.upForGrabsToday === 0 ? 'Nothing waiting to be claimed.' : day()!.upForGrabsToday + (day()!.upForGrabsToday === 1 ? ' task needs' : ' tasks need') + ' someone →' }}
+            </p>
+          </a>
+
+          <!-- Hours request -->
+          @if (day()!.semesterName) {
+            <a routerLink="/schedule" class="glass-panel block rounded-3xl p-5 hover:bg-white/70">
+              <h2 class="font-semibold text-slate-900">Your hours</h2>
+              <p class="mt-1 text-sm text-slate-600">
+                @if (!day()!.request) { Not submitted for {{ day()!.semesterName }} yet → }
+                @else if (day()!.request!.status === 'SUBMITTED') { Waiting for approval. }
+                @else { Approved{{ day()!.request!.status === 'APPROVED_WITH_CHANGES' ? ' with changes' : '' }}. }
+              </p>
+            </a>
+          }
+        </div>
+      </div>
+    }
+  </div>
+}

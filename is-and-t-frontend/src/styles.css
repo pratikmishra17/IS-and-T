@@ -11,8 +11,12 @@ body {
   min-width: 320px;
 }
 
-button, input, textarea {
-  font: inherit;
+/* In Tailwind's base layer, so utility classes such as text-sm on a button or input still win.
+   (Plain CSS outside a layer beats everything inside layers.) */
+@layer base {
+  button, input, textarea, select {
+    font: inherit;
+  }
 }
 
 ::selection {

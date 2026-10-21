@@ -21,7 +21,8 @@ import com.isandt.backend.calendar.SemesterService;
  * <ol>
  * <li>their weekly shifts for that weekday, if the date is inside a semester,</li>
  * <li>none of those if the date has a day off (CANCEL),</li>
- * <li>plus any extra shifts (EXTRA) on that date.</li>
+ * <li>plus any extra shifts (EXTRA) on that date,</li>
+ * <li>with any time off (OFF) cut out: 09:00–13:00 with 10:00–11:00 off becomes 09:00–10:00 and 11:00–13:00.</li>
  * </ol>
  * Nothing is stored per date: it's worked out from the weekly pattern each time it's needed.
  */
@@ -32,8 +33,17 @@ public class ShiftCalendar {
 	public record Shift(LocalTime start, LocalTime end, boolean extra) {
 	}
 
-	/** A student's day: their shifts, and whether the weekly shifts were cancelled. */
-	public record Day(List<Shift> shifts, boolean cancelled) {
+	/** A stretch of time on one date. */
+	public record Window(LocalTime start, LocalTime end) {
+	}
+
+	/** A student's day: their shifts (time off already cut out), whether it's a day off, and the time off. */
+	public record Day(List<Shift> shifts, boolean cancelled, List<Window> timeOff) {
+
+		public Day(List<Shift> shifts, boolean cancelled) {
+			this(shifts, cancelled, List.of());
+		}
+
 	}
 
 	private final SemesterService semesters;
@@ -78,10 +88,39 @@ public class ShiftCalendar {
 					.filter(change -> change.studentId().equals(studentId) && change.getDate().equals(day)
 							&& change.getType() == ShiftExceptionType.EXTRA)
 					.forEach(change -> shifts.add(new Shift(change.getStart(), change.getEnd(), true)));
-				shifts.sort(Comparator.comparing(Shift::start));
-				days.put(day, new Day(List.copyOf(shifts), cancelled));
+				List<Window> off = changes.stream()
+					.filter(change -> change.studentId().equals(studentId) && change.getDate().equals(day)
+							&& change.getType() == ShiftExceptionType.OFF)
+					.map(change -> new Window(change.getStart(), change.getEnd()))
+					.sorted(Comparator.comparing(Window::start))
+					.toList();
+				List<Shift> working = cutOut(shifts, off);
+				working.sort(Comparator.comparing(Shift::start));
+				days.put(day, new Day(List.copyOf(working), cancelled, off));
 			}
 			result.put(studentId, days);
+		}
+		return result;
+	}
+
+	/** The shifts with every time-off window removed; a shift can be split in two. */
+	static List<Shift> cutOut(List<Shift> shifts, List<Window> off) {
+		List<Shift> result = new ArrayList<>(shifts);
+		for (Window window : off) {
+			List<Shift> next = new ArrayList<>();
+			for (Shift shift : result) {
+				if (!window.start().isBefore(shift.end()) || !shift.start().isBefore(window.end())) {
+					next.add(shift); // no overlap
+					continue;
+				}
+				if (shift.start().isBefore(window.start())) {
+					next.add(new Shift(shift.start(), window.start(), shift.extra()));
+				}
+				if (window.end().isBefore(shift.end())) {
+					next.add(new Shift(window.end(), shift.end(), shift.extra()));
+				}
+			}
+			result = next;
 		}
 		return result;
 	}

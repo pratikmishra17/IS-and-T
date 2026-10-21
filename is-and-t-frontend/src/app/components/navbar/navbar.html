@@ -7,7 +7,7 @@
   </a>
 
   @if (auth.isLoggedIn()) {
-    <nav aria-label="Main navigation" class="col-span-2 row-start-2 flex justify-center gap-1 rounded-2xl border border-white/60 bg-white/25 p-1 sm:col-span-1 sm:col-start-2 sm:row-start-1">
+    <nav aria-label="Main navigation" class="col-span-2 row-start-2 hidden justify-center sm:flex gap-1 rounded-2xl border border-white/60 bg-white/25 p-1 sm:col-span-1 sm:col-start-2 sm:row-start-1">
       @for (section of sections(); track section) {
         <a [routerLink]="'/' + section" routerLinkActive="bg-white/60" ariaCurrentWhenActive="page" class="glass-link px-4 capitalize">{{ section }}</a>
       }
@@ -29,3 +29,29 @@
     </div>
   }
 </header>
+
+@if (auth.isLoggedIn()) {
+  <!-- Phones only: a tab bar fixed to the bottom of the screen -->
+  <nav aria-label="Main navigation" class="fixed inset-x-3 bottom-3 z-40 sm:hidden">
+    @if (moreOpen()) {
+      <div id="more-menu" class="absolute bottom-full right-0 mb-2 w-56 rounded-2xl border border-white bg-[#eef4f1]/95 p-2 shadow-xl backdrop-blur-xl">
+        <a routerLink="/account" class="glass-link block" (click)="moreOpen.set(false)">My account</a>
+        <a routerLink="/inventory" class="glass-link block" (click)="moreOpen.set(false)">Inventory</a>
+        <div class="my-1 border-t border-slate-200/70"></div>
+        <a routerLink="/logout" class="glass-link block" (click)="moreOpen.set(false)">Log out</a>
+      </div>
+    }
+    <div class="glass-panel grid grid-cols-4 rounded-3xl px-1 py-1.5">
+      @for (tab of mobileTabs(); track tab.path) {
+        <a [routerLink]="tab.path" routerLinkActive="bg-white/80 text-teal-950" ariaCurrentWhenActive="page" class="flex flex-col items-center gap-0.5 rounded-2xl py-1.5 text-[0.7rem] font-medium text-slate-600" (click)="moreOpen.set(false)">
+          <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path [attr.d]="tab.icon" /></svg>
+          {{ tab.label }}
+        </a>
+      }
+      <button type="button" class="flex cursor-pointer flex-col items-center gap-0.5 rounded-2xl py-1.5 text-[0.7rem] font-medium text-slate-600" aria-controls="more-menu" [attr.aria-expanded]="moreOpen()" (click)="moreOpen.set(!moreOpen())">
+        <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path [attr.d]="moreIcon" /></svg>
+        More
+      </button>
+    </div>
+  </nav>
+}

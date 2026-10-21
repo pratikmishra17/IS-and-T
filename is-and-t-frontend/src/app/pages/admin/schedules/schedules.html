@@ -10,6 +10,9 @@
   <button type="button" role="tab" class="rounded-xl px-4 py-2 text-sm font-medium text-slate-700 hover:bg-white/60" [class.bg-white]="tab() === 'requests'" [class.shadow-sm]="tab() === 'requests'" [attr.aria-selected]="tab() === 'requests'" (click)="tab.set('requests')">
     Requests @if (requests().length > 0) { <span class="badge ml-1 bg-amber-100 text-amber-900">{{ requests().length }}</span> }
   </button>
+  <button type="button" role="tab" class="rounded-xl px-4 py-2 text-sm font-medium text-slate-700 hover:bg-white/60" [class.bg-white]="tab() === 'timeoff'" [class.shadow-sm]="tab() === 'timeoff'" [attr.aria-selected]="tab() === 'timeoff'" (click)="tab.set('timeoff')">
+    Time off @if (timeOff().length > 0) { <span class="badge ml-1 bg-amber-100 text-amber-900">{{ timeOff().length }}</span> }
+  </button>
 </div>
 
 <section class="glass-panel mt-4 rounded-3xl p-4 sm:p-6">
@@ -56,6 +59,7 @@
                     <td class="px-2 py-2.5" [class.bg-teal-50]="day.date === today">
                       <div class="flex flex-col gap-1">
                         @if (day.cancelled) { <span class="badge w-fit bg-slate-200 text-slate-600">Day off</span> }
+                        @for (off of day.timeOff; track off.start) { <span class="badge w-fit bg-slate-200 text-slate-600">Off {{ off.start }}–{{ off.end }}</span> }
                         @for (shift of day.shifts; track shift.start) {
                           <span class="w-fit rounded-lg px-2 py-0.5 text-xs font-medium" [class]="shift.extra ? 'border border-dashed border-teal-600 text-teal-900' : 'bg-teal-100/80 text-teal-950'">{{ shift.start }}–{{ shift.end }}</span>
                         }
@@ -72,6 +76,57 @@
         </div>
         <p class="mt-3 text-xs text-slate-500">Solid: weekly shift · dashed: extra shift for that day only · red hours: over the weekly limit.</p>
       }
+    }
+  } @else if (tab() === 'timeoff') {
+    @if (lastOutcome(); as outcome) {
+      <div role="status" class="mb-4 rounded-2xl bg-white/70 px-4 py-3 text-sm">
+        <div class="flex items-start justify-between gap-3">
+          <p class="font-semibold text-slate-900">{{ outcome.title }}</p>
+          <button type="button" class="icon-button size-6" aria-label="Dismiss" (click)="lastOutcome.set(null)">✕</button>
+        </div>
+        @if (outcome.lines.length === 0) { <p class="mt-1 text-slate-600">No tasks were affected.</p> }
+        <ul class="mt-1 space-y-1">
+          @for (line of outcome.lines; track $index) {
+            <li [class.text-rose-900]="line.includes('couldn')" [class.font-medium]="line.includes('couldn')" [class.text-slate-700]="!line.includes('couldn')">{{ line.includes('couldn') ? '⚠ ' : '✓ ' }}{{ line }}</li>
+          }
+        </ul>
+      </div>
+    }
+    @if (timeOff().length === 0) {
+      <p class="py-12 text-center text-sm text-slate-600">No time-off requests waiting. Students ask from their Schedule page.</p>
+    } @else {
+      <ul class="space-y-3">
+        @for (request of timeOff(); track request.id) {
+          <li class="rounded-2xl border border-white/70 bg-white/50 p-4">
+            <div class="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <p class="font-semibold text-slate-900">{{ request.studentName }}</p>
+                <p class="text-sm text-slate-700">{{ request.date | date: 'EEEE, MMM d' }} · {{ window(request) }}</p>
+                @if (request.reason) { <p class="mt-1 text-sm text-slate-600">“{{ request.reason }}”</p> }
+              </div>
+              <p class="text-xs text-slate-500">asked {{ request.submittedAt | date: 'MMM d, h:mm a' }}</p>
+            </div>
+            @if (request.affectedTasks.length > 0) {
+              <div class="mt-3 rounded-xl bg-amber-50/80 px-3 py-2 text-sm text-amber-950">
+                <p class="font-medium">Approving moves {{ request.affectedTasks.length === 1 ? 'this task' : 'these tasks' }} to someone else on shift:</p>
+                <ul class="mt-1">
+                  @for (task of request.affectedTasks; track task.id) { <li>• {{ task.startTime }}–{{ task.endTime }} {{ task.title }}</li> }
+                </ul>
+              </div>
+            } @else {
+              <p class="mt-2 text-xs text-slate-500">No tasks in that time.</p>
+            }
+            <div class="mt-3 flex flex-col gap-2 sm:flex-row">
+              <label class="sr-only" [for]="'note-' + request.id">Note to the student</label>
+              <input [id]="'note-' + request.id" class="glass-input min-w-0 flex-1 rounded-xl px-3 py-2 text-sm" placeholder="Note to the student (optional)" maxlength="500" [(ngModel)]="reviewNotes[request.id]" />
+              <div class="flex gap-2">
+                <button type="button" class="btn btn-quiet" [disabled]="reviewingId() === request.id" (click)="decline(request)">Decline</button>
+                <button type="button" class="btn submit-button text-white" [disabled]="reviewingId() === request.id" (click)="approve(request)">Approve</button>
+              </div>
+            </div>
+          </li>
+        }
+      </ul>
     }
   } @else {
     @if (requests().length === 0) {
@@ -148,7 +203,7 @@
               <li class="flex items-center justify-between gap-2 py-2 text-sm">
                 <span>
                   <span class="font-medium text-slate-800">{{ change.date | date: 'EEE, MMM d' }}</span>:
-                  {{ change.type === 'CANCEL' ? 'day off' : 'extra ' + change.start + '–' + change.end }}
+                  {{ change.type === 'CANCEL' ? 'day off' : (change.type === 'OFF' ? 'off ' : 'extra ') + change.start + '–' + change.end }}
                   @if (change.reason) { <span class="text-slate-500">({{ change.reason }})</span> }
                 </span>
                 <button type="button" class="icon-button" [attr.aria-label]="'Delete the change on ' + change.date" (click)="deleteChange(change)">✕</button>
@@ -165,11 +220,12 @@
                 <label for="change-type" class="field-label">Change</label>
                 <select id="change-type" name="type" [(ngModel)]="change.type" class="glass-input w-full rounded-xl px-3 py-2 text-sm">
                   <option value="CANCEL">Day off</option>
+                  <option value="OFF">Time off (hours)</option>
                   <option value="EXTRA">Extra shift</option>
                 </select>
               </div>
             </div>
-            @if (change.type === 'EXTRA') {
+            @if (change.type !== 'CANCEL') {
               <div class="grid grid-cols-2 gap-2">
                 <div><label for="change-start" class="field-label">From</label><input id="change-start" name="start" type="time" [(ngModel)]="change.start" required class="glass-input w-full rounded-xl px-3 py-2 text-sm" /></div>
                 <div><label for="change-end" class="field-label">To</label><input id="change-end" name="end" type="time" [(ngModel)]="change.end" required class="glass-input w-full rounded-xl px-3 py-2 text-sm" /></div>

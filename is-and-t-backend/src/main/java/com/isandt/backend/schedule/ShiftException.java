@@ -19,7 +19,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
-/** A one-off change for one date: a day off (CANCEL) or an extra shift (EXTRA, with times). */
+/** A one-off change for one date: a day off (CANCEL), an extra shift (EXTRA) or time off for part of it (OFF). */
 @Entity
 @Table(name = "shift_exceptions")
 public class ShiftException {
@@ -61,8 +61,9 @@ public class ShiftException {
 		this.student = student;
 		this.date = request.date();
 		this.type = request.type();
-		this.start = request.type() == ShiftExceptionType.EXTRA ? request.start() : null;
-		this.end = request.type() == ShiftExceptionType.EXTRA ? request.end() : null;
+		boolean timed = request.type() != ShiftExceptionType.CANCEL;
+		this.start = timed ? request.start() : null;
+		this.end = timed ? request.end() : null;
 		this.reason = request.reason() == null || request.reason().isBlank() ? null : request.reason().trim();
 		this.createdBy = createdBy;
 		this.createdAt = Instant.now();

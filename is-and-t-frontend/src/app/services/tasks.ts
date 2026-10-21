@@ -82,6 +82,8 @@ export interface Backorder {
 export interface MyTasks {
   upcoming: Task[];
   available: Task[];
+  /** Ids of available tasks that fall entirely inside one of your shifts. */
+  availableDuringMyShifts: number[];
   recent: Task[];
 }
 

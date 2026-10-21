@@ -24,7 +24,8 @@ export interface RequestInfo {
 export interface ShiftChange {
   id: number;
   date: string;
-  type: 'CANCEL' | 'EXTRA';
+  /** CANCEL: day off · EXTRA: added shift · OFF: time off for part of the day */
+  type: 'CANCEL' | 'EXTRA' | 'OFF';
   start: string | null;
   end: string | null;
   reason: string | null;
@@ -63,7 +64,13 @@ export interface Week {
   students: {
     studentId: number;
     name: string;
-    days: { date: string; shifts: { start: string; end: string; extra: boolean }[]; cancelled: boolean }[];
+    days: {
+      date: string;
+      shifts: { start: string; end: string; extra: boolean }[];
+      cancelled: boolean;
+      /** Approved time off for part of the day. */
+      timeOff: { start: string; end: string }[];
+    }[];
     hours: number;
     overLimit: boolean;
   }[];

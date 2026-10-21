@@ -4,5 +4,7 @@ public enum ShiftExceptionType {
 	/** No shifts on this date (sick day, exam day). */
 	CANCEL,
 	/** An added shift on this date. */
-	EXTRA
+	EXTRA,
+	/** Time off for part of this date (with times): shifts that day are cut around it. */
+	OFF
 }

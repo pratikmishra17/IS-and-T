@@ -55,8 +55,12 @@ public final class TaskResponses {
 	public record Candidate(Long id, String name, boolean eligible) {
 	}
 
-	/** A student's own task lists in the user portal. */
-	public record MyTasks(List<TaskResponse> upcoming, List<TaskResponse> available, List<TaskResponse> recent) {
+	/**
+	 * A student's own task lists in the user portal. availableDuringMyShifts: ids of the available
+	 * tasks that fall entirely inside one of this student's shifts.
+	 */
+	public record MyTasks(List<TaskResponse> upcoming, List<TaskResponse> available, List<Long> availableDuringMyShifts,
+			List<TaskResponse> recent) {
 	}
 
 	/** A backordered item with the task that still owes it. */

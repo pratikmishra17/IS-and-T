@@ -31,6 +31,8 @@ public class SecurityConfig {
 				.requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/set-password",
 						"/api/auth/forgot-password").permitAll()
 				.requestMatchers(HttpMethod.GET, "/api/auth/me").permitAll()
+				// Calendar apps fetch feeds without logging in; the secret token in the URL protects them.
+				.requestMatchers(HttpMethod.GET, "/api/calendar/*").permitAll()
 				.requestMatchers("/error").permitAll()
 				.requestMatchers("/api/admin/**").hasRole("ADMIN")
 				.requestMatchers("/api/me/**").hasRole("STUDENT")

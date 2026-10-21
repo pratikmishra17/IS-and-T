@@ -146,6 +146,15 @@ public class AdminScheduleService {
 				warnings.add(student.getFirstName() + " had no weekly shift on " + date.format(DAY) + " anyway.");
 			}
 		}
+		else if (request.type() == ShiftExceptionType.OFF) {
+			if (request.start() == null || request.end() == null || !request.end().isAfter(request.start())) {
+				throw new ConflictException("Time off needs a start and an end, and the end must be after the start.");
+			}
+			TimeBlock off = new TimeBlock(date.getDayOfWeek(), request.start(), request.end());
+			if (day.shifts().stream().noneMatch(shift -> off.overlaps(new TimeBlock(date.getDayOfWeek(), shift.start(), shift.end())))) {
+				throw new ConflictException(student.getFirstName() + " isn't working then on " + date.format(DAY) + ".");
+			}
+		}
 		else {
 			if (request.start() == null || request.end() == null || !request.end().isAfter(request.start())) {
 				throw new ConflictException("An extra shift needs a start and an end, and the end must be after the start.");
@@ -195,7 +204,8 @@ public class AdminScheduleService {
 			List<StudentDay> studentDays = days.stream().map(weekDay -> {
 				ShiftCalendar.Day day = shifts.get(student.getId()).get(weekDay.date());
 				return new StudentDay(weekDay.date(),
-						day.shifts().stream().map(s -> new WeekShift(s.start(), s.end(), s.extra())).toList(), day.cancelled());
+						day.shifts().stream().map(s -> new WeekShift(s.start(), s.end(), s.extra())).toList(), day.cancelled(),
+						day.timeOff().stream().map(w -> new WeekShift(w.start(), w.end(), false)).toList());
 			}).toList();
 			double hours = studentDays.stream().flatMap(d -> d.shifts().stream())
 					.mapToLong(s -> Duration.between(s.start(), s.end()).toMinutes()).sum() / 60.0;

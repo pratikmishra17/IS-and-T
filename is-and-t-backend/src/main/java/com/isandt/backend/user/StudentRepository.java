@@ -13,6 +13,8 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
 
 	boolean existsByStudentId(String studentId);
 
+	Optional<Student> findByCalendarToken(String calendarToken);
+
 	List<Student> findAllByOrderByLastNameAscFirstNameAsc();
 
 }

@@ -38,6 +38,11 @@
 <div class="mt-6 grid gap-4 lg:grid-cols-3">
   <section class="glass-panel rounded-3xl p-5 lg:col-span-2" aria-labelledby="attention-title">
     <h2 id="attention-title" class="font-semibold text-slate-900">Needs attention</h2>
+    @if (timeOffPending() > 0) {
+      <a routerLink="/admin/schedules" class="mt-3 flex items-center justify-between rounded-2xl bg-amber-50/80 px-4 py-3 text-sm font-medium text-amber-950 hover:bg-amber-100/80">
+        {{ timeOffPending() }} time-off request{{ timeOffPending() === 1 ? '' : 's' }} to review <span aria-hidden="true">→</span>
+      </a>
+    }
     <p class="mt-1 text-sm text-slate-600">People who were added but haven’t set their password yet. Their link expires after 48 hours.</p>
     @if (!loading() && waiting().length === 0) {
       <p class="mt-6 rounded-2xl bg-teal-50/70 px-4 py-3 text-sm text-teal-900">Everyone has set their password.</p>

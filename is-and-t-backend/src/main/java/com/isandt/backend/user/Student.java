@@ -13,6 +13,9 @@ public class Student extends Account {
 	@Column(nullable = false, unique = true)
 	private String studentId;
 
+	/** The secret in this student's calendar link; null until they ask for one. */
+	private String calendarToken;
+
 	protected Student() {
 	}
 
@@ -28,6 +31,14 @@ public class Student extends Account {
 
 	public void changeStudentId(String studentId) {
 		this.studentId = studentId.trim();
+	}
+
+	public String getCalendarToken() {
+		return calendarToken;
+	}
+
+	public void changeCalendarToken(String calendarToken) {
+		this.calendarToken = calendarToken;
 	}
 
 	public String getStudentId() {

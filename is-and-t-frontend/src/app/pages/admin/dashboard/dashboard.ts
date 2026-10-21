@@ -7,6 +7,7 @@ import { CalendarApi, Holiday, Semester } from '../../../services/calendar';
 import { InventoryApi, Item } from '../../../services/inventory';
 import { AdminScheduleApi, Week } from '../../../services/schedule';
 import { AdminTaskApi, Task } from '../../../services/tasks';
+import { AdminTimeOffApi } from '../../../services/time-off';
 import { errorMessage } from '../../../services/errors';
 import { Toasts } from '../../../ui/toast';
 
@@ -25,6 +26,8 @@ export class AdminDashboard implements OnInit {
   private readonly inventory = inject(InventoryApi);
   private readonly schedule = inject(AdminScheduleApi);
   private readonly taskApi = inject(AdminTaskApi);
+  private readonly timeOffApi = inject(AdminTimeOffApi);
+  protected readonly timeOffPending = signal(0);
   private readonly toasts = inject(Toasts);
   protected readonly auth = inject(Auth);
   protected readonly today = new Date();
@@ -73,10 +76,11 @@ export class AdminDashboard implements OnInit {
   async ngOnInit(): Promise<void> {
     try {
       const todayIso = this.today.toLocaleDateString('en-CA');
-      const [students, admins, semesters, holidays, items, week, tasks] = await Promise.all([
+      const [students, admins, semesters, holidays, items, week, tasks, timeOff] = await Promise.all([
         this.api.list('students'), this.api.list('admins'), this.calendar.semesters(), this.calendar.holidays(),
-        this.inventory.items(), this.schedule.week(), this.taskApi.list(todayIso, todayIso),
+        this.inventory.items(), this.schedule.week(), this.taskApi.list(todayIso, todayIso), this.timeOffApi.count(),
       ]);
+      this.timeOffPending.set(timeOff.pending);
       this.todaysTasks.set(tasks);
       this.items.set(items);
       this.week.set(week);

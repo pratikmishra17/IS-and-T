@@ -1,4 +1,4 @@
-<section class="glass-panel rounded-[2rem] p-7 sm:p-10" aria-labelledby="schedule-title">
+<section class="glass-panel mx-auto max-w-3xl rounded-[2rem] p-6 sm:p-10" aria-labelledby="schedule-title">
   <p class="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-teal-800">Plan your hours</p>
   <h1 id="schedule-title" class="text-4xl font-semibold tracking-tight text-slate-900">My schedule.</h1>
 
@@ -6,6 +6,136 @@
     <p class="mt-4 text-sm leading-6 text-slate-600">Admins plan everyone’s shifts in the <a routerLink="/admin/schedules" class="font-medium text-teal-900 underline">admin portal</a>.</p>
   } @else if (loading()) {
     <p class="mt-6 text-sm text-slate-600">Loading…</p>
+  } @else {
+    <div role="tablist" aria-label="Schedule" class="mt-6 inline-flex gap-1 rounded-2xl border border-white/60 bg-white/30 p-1">
+      <button type="button" role="tab" class="rounded-xl px-4 py-2 text-sm font-medium text-slate-700 hover:bg-white/60" [class.bg-white]="tab() === 'week'" [class.shadow-sm]="tab() === 'week'" [attr.aria-selected]="tab() === 'week'" (click)="tab.set('week')">My week</button>
+      <button type="button" role="tab" class="rounded-xl px-4 py-2 text-sm font-medium text-slate-700 hover:bg-white/60" [class.bg-white]="tab() === 'hours'" [class.shadow-sm]="tab() === 'hours'" [attr.aria-selected]="tab() === 'hours'" (click)="tab.set('hours')">My hours</button>
+      <button type="button" role="tab" class="rounded-xl px-4 py-2 text-sm font-medium text-slate-700 hover:bg-white/60" [class.bg-white]="tab() === 'timeoff'" [class.shadow-sm]="tab() === 'timeoff'" [attr.aria-selected]="tab() === 'timeoff'" (click)="tab.set('timeoff')">Time off</button>
+    </div>
+  }
+
+  @if (auth.isAdmin() || loading()) {
+  } @else if (tab() === 'week') {
+    @if (week(); as w) {
+      <div class="mt-5 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p class="font-semibold text-slate-900">Week of {{ w.start | date: 'MMM d' }}</p>
+          <p class="text-sm text-slate-600">{{ w.hours }} h scheduled@if (w.weeklyHourLimit) { of {{ w.weeklyHourLimit }} h · {{ w.semesterName }} }</p>
+        </div>
+        <div class="flex gap-1">
+          <button type="button" class="btn btn-quiet px-3 py-2" aria-label="Previous week" (click)="moveWeek(-1)">←</button>
+          <button type="button" class="btn btn-quiet px-3 py-2" (click)="moveWeek(0)">This week</button>
+          <button type="button" class="btn btn-quiet px-3 py-2" aria-label="Next week" (click)="moveWeek(1)">→</button>
+        </div>
+      </div>
+      <ul class="mt-4 space-y-2">
+        @for (day of w.days; track day.date) {
+          <li class="rounded-2xl border p-3" [class]="day.date === today ? 'border-teal-300 bg-teal-50/70' : 'border-white/70 bg-white/40'">
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="font-semibold text-slate-900">{{ day.date | date: 'EEEE' }}</span>
+              <span class="text-sm text-slate-500">{{ day.date | date: 'MMM d' }}</span>
+              @if (day.date === today) { <span class="badge bg-teal-800 text-white">Today</span> }
+              @if (day.holiday) { <span class="badge bg-rose-100 text-rose-900">{{ day.holiday }}</span> }
+              @if (day.dayOff) { <span class="badge bg-slate-200 text-slate-700">Day off</span> }
+              @for (off of day.timeOff; track off.start) { <span class="badge bg-slate-200 text-slate-700">Off {{ off.start }}–{{ off.end }}</span> }
+            </div>
+            @if (day.shifts.length === 0 && day.tasks.length === 0) {
+              <p class="mt-1 text-sm text-slate-400">Not working</p>
+            }
+            <div class="mt-2 flex flex-wrap gap-1.5">
+              @for (shift of day.shifts; track shift.start) {
+                <span class="rounded-lg px-2 py-0.5 text-xs font-medium" [class]="shift.extra ? 'border border-dashed border-teal-600 text-teal-900' : 'bg-teal-100/80 text-teal-950'">{{ shift.extra ? 'Extra ' : '' }}{{ shift.start }}–{{ shift.end }}</span>
+              }
+            </div>
+            @for (task of day.tasks; track task.id) {
+              <p class="mt-1.5 text-sm text-slate-700"><span class="font-medium">{{ task.startTime }}</span> {{ task.title }} <span class="text-slate-500">· {{ task.building }} {{ task.room }}{{ task.status === 'COMPLETED' ? ' · done' : '' }}</span></p>
+            }
+          </li>
+        }
+      </ul>
+    }
+
+    <div class="mt-8 rounded-2xl border border-white/70 bg-white/40 p-4">
+      <h2 class="font-semibold text-slate-900">Add to my calendar</h2>
+      <p class="mt-1 text-sm text-slate-600">Subscribe once and your shifts and tasks appear in Google, Apple or Outlook calendar, updating by themselves.</p>
+      @if (!calendarLink()) {
+        <button type="button" class="btn btn-quiet mt-3" (click)="showCalendarLink()">Get my calendar link</button>
+      } @else {
+        <div class="mt-3 flex gap-2">
+          <label class="sr-only" for="calendar-link">Your calendar link</label>
+          <input id="calendar-link" readonly class="glass-input min-w-0 flex-1 rounded-xl px-3 py-2 font-mono text-xs" [value]="calendarLink()!.url" (focus)="$any($event.target).select()" />
+          <button type="button" class="btn submit-button text-white" (click)="copyCalendarLink()">Copy</button>
+        </div>
+        <ul class="mt-3 space-y-1 text-sm text-slate-600">
+          <li><span class="font-medium text-slate-800">Apple Calendar / iPhone:</span> <a class="text-teal-900 underline" [href]="calendarLink()!.webcalUrl">open this link</a> and confirm the subscription.</li>
+          <li><span class="font-medium text-slate-800">Google Calendar:</span> Other calendars → + → From URL, then paste the link.</li>
+          <li><span class="font-medium text-slate-800">Outlook:</span> Add calendar → Subscribe from web, then paste the link.</li>
+        </ul>
+        <p class="mt-2 text-xs text-slate-500">Keep this link private: anyone with it can see your schedule. <button type="button" class="font-medium text-teal-900 underline" (click)="newCalendarLink()">Make a new link</button></p>
+      }
+    </div>
+  } @else if (tab() === 'timeoff') {
+    <div class="mt-6">
+      <h2 class="font-semibold text-slate-900">Ask for time off</h2>
+      <p class="mt-1 text-sm text-slate-600">An admin approves it. Any of your tasks in that time go to someone else who’s working then.</p>
+      <div class="mt-4 space-y-4 rounded-2xl border border-white/70 bg-white/40 p-4">
+        <div>
+          <label for="off-date" class="field-label">Date</label>
+          <input id="off-date" type="date" class="glass-input w-full rounded-xl px-3 py-2.5 text-sm sm:w-56" [min]="today" [ngModel]="timeOffDraft.date" (ngModelChange)="timeOffDateChanged($event)" />
+        </div>
+        <fieldset>
+          <legend class="field-label">How much?</legend>
+          <div class="grid grid-cols-3 gap-2">
+            @for (option of [{ id: 'day', label: 'Whole day' }, { id: 'shift', label: 'One shift' }, { id: 'hours', label: 'Some hours' }]; track option.id) {
+              <label class="flex cursor-pointer items-center justify-center rounded-xl border px-2 py-2 text-center text-sm font-medium" [class]="timeOffDraft.kind === option.id ? 'border-teal-700 bg-teal-50 text-teal-950' : 'border-white/80 bg-white/50 text-slate-700'">
+                <input type="radio" name="off-kind" class="sr-only" [value]="option.id" [(ngModel)]="timeOffDraft.kind" />{{ option.label }}
+              </label>
+            }
+          </div>
+        </fieldset>
+        @if (timeOffDraft.kind === 'shift') {
+          <div>
+            <label for="off-shift" class="field-label">Which shift</label>
+            @if (shiftsOnDate().length === 0) {
+              <p id="off-shift" class="text-sm text-slate-500">{{ timeOffDraft.date ? 'You have no shifts that day.' : 'Choose a date first.' }}</p>
+            } @else {
+              <select id="off-shift" class="glass-input w-full rounded-xl px-3 py-2.5 text-sm" [(ngModel)]="timeOffDraft.shift">
+                @for (shift of shiftsOnDate(); track shift.start) { <option [value]="shift.start + '-' + shift.end">{{ shift.start }}–{{ shift.end }}</option> }
+              </select>
+            }
+          </div>
+        }
+        @if (timeOffDraft.kind === 'hours') {
+          <div class="grid grid-cols-2 gap-2 sm:w-72">
+            <div><label for="off-start" class="field-label">From</label><input id="off-start" type="time" class="glass-input w-full rounded-xl px-3 py-2.5 text-sm" [(ngModel)]="timeOffDraft.start" /></div>
+            <div><label for="off-end" class="field-label">To</label><input id="off-end" type="time" class="glass-input w-full rounded-xl px-3 py-2.5 text-sm" [(ngModel)]="timeOffDraft.end" /></div>
+          </div>
+        }
+        <div>
+          <label for="off-reason" class="field-label">Reason <span class="font-normal text-slate-500">(optional)</span></label>
+          <input id="off-reason" maxlength="500" placeholder="Exam, doctor’s appointment…" class="glass-input w-full rounded-xl px-3 py-2.5 text-sm" [(ngModel)]="timeOffDraft.reason" />
+        </div>
+        @if (timeOffError()) { <p role="alert" class="rounded-2xl bg-rose-50/90 px-4 py-3 text-sm text-rose-900">{{ timeOffError() }}</p> }
+        <button type="button" class="btn submit-button w-full text-white sm:w-auto" [disabled]="sendingTimeOff()" (click)="requestTimeOff()">{{ sendingTimeOff() ? 'Sending…' : 'Send request' }}</button>
+      </div>
+
+      <h2 class="mt-8 text-sm font-semibold uppercase tracking-widest text-slate-500">Your requests</h2>
+      @if (myTimeOff().length === 0) { <p class="mt-2 text-sm text-slate-600">None yet.</p> }
+      <ul class="mt-2 divide-y divide-slate-200/70">
+        @for (request of myTimeOff(); track request.id) {
+          <li class="flex flex-wrap items-center justify-between gap-2 py-2.5 text-sm">
+            <div>
+              <p class="font-medium text-slate-800">{{ request.date | date: 'EEE, MMM d' }} · {{ window(request) }}</p>
+              @if (request.reviewNote) { <p class="text-slate-500">“{{ request.reviewNote }}”</p> }
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="badge" [class]="request.status === 'APPROVED' ? 'bg-teal-100 text-teal-900' : request.status === 'PENDING' ? 'bg-amber-100 text-amber-900' : 'bg-slate-200 text-slate-700'">{{ request.status === 'PENDING' ? 'Waiting' : (request.status.charAt(0) + request.status.slice(1).toLowerCase()) }}</span>
+              @if (request.status === 'PENDING') { <button type="button" class="text-sm font-medium text-teal-900 hover:underline" (click)="withdrawTimeOff(request)">Withdraw</button> }
+            </div>
+          </li>
+        }
+      </ul>
+    </div>
   } @else if (semesters().length === 0) {
     <p class="mt-4 text-sm leading-6 text-slate-600">There’s no current or upcoming semester yet. Check back once an admin has added one.</p>
   } @else {
@@ -70,6 +200,23 @@
         <button type="button" class="btn btn-quiet flex-1" [disabled]="busy()" (click)="save(false)">Save</button>
         <button type="button" class="btn submit-button flex-1 text-white" [disabled]="busy() || preferred().length === 0" (click)="save(true)">{{ busy() ? 'Saving…' : 'Submit for approval' }}</button>
       </div>
+
+      @if (semesterHours().length > 0 && s.shifts.length > 0) {
+        <details class="mt-8 rounded-2xl border border-white/70 bg-white/40 p-4">
+          <summary class="cursor-pointer text-sm font-semibold text-slate-800">Hours by week in {{ s.semester.name }}</summary>
+          <table class="mt-3 w-full text-left text-sm">
+            <thead class="text-xs uppercase tracking-wider text-slate-500"><tr><th scope="col" class="py-1.5">Week of</th><th scope="col" class="py-1.5 text-right">Hours</th></tr></thead>
+            <tbody class="divide-y divide-slate-200/60">
+              @for (week of semesterHours(); track week.weekStart) {
+                <tr>
+                  <td class="py-1.5 text-slate-700">{{ week.weekStart | date: 'MMM d' }}</td>
+                  <td class="py-1.5 text-right font-medium" [class.text-rose-800]="week.hours > s.semester.weeklyHourLimit" [class.text-slate-900]="week.hours <= s.semester.weeklyHourLimit">{{ week.hours }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </details>
+      }
     }
   }
   @if (error() && semesters().length === 0) { <p role="alert" class="mt-6 rounded-2xl bg-rose-50/80 px-4 py-3 text-sm text-rose-900">{{ error() }}</p> }

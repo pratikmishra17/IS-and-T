@@ -1,15 +1,9 @@
 import { Routes } from '@angular/router';
 import { UserLayout } from './layouts/user-layout/user-layout';
-import { Account } from './pages/account/account';
-import { Contact } from './pages/contact/contact';
 import { ForgotPassword } from './pages/forgot-password/forgot-password';
-import { Home } from './pages/home/home';
-import { Inventory } from './pages/inventory/inventory';
 import { Login } from './pages/login/login';
 import { Logout } from './pages/logout/logout';
-import { Schedule } from './pages/schedule/schedule';
 import { SetPassword } from './pages/set-password/set-password';
-import { Tasks } from './pages/tasks/tasks';
 import { adminGuard, adminGuestGuard, authGuard, guestGuard } from './services/auth.guards';
 
 // Each URL maps to a page component. Routes are matched top to bottom.
@@ -36,7 +30,7 @@ export const routes: Routes = [
           { path: 'tasks', title: 'Tasks · IS&T Admin', loadComponent: () => import('./pages/admin/tasks/tasks').then((m) => m.AdminTasks) },
           { path: 'inventory', title: 'Inventory · IS&T Admin', loadComponent: () => import('./pages/admin/inventory/inventory').then((m) => m.AdminInventory) },
           { path: 'settings', title: 'Settings · IS&T Admin', loadComponent: () => import('./pages/admin/settings/settings').then((m) => m.AdminSettings) },
-          { path: 'account', title: 'My account · IS&T Admin', loadComponent: () => import('./pages/admin/account/account').then((m) => m.AdminAccount) },
+          { path: 'account', title: 'My account · IS&T Admin', loadComponent: () => import('./pages/account/account').then((m) => m.Account) },
         ],
       },
       { path: '**', redirectTo: '' },
@@ -56,19 +50,19 @@ export const routes: Routes = [
 
       // Open to everyone (the link in the email must work whether or not someone is logged in)
       { path: 'set-password', component: SetPassword, title: 'Set password · IS&T' },
-      { path: 'contact', component: Contact, title: 'Contact · IS&T' },
       { path: 'logout', component: Logout, title: 'Log out · IS&T' },
 
-      // Logged-in users only; the guard on this group covers every page in it
+      // Logged-in users only; the guard on this group covers every page in it. Loaded on demand
+      // (lazy), so the login page doesn't download them.
       {
         path: '',
         canActivate: [authGuard],
         children: [
-          { path: 'home', component: Home, title: 'Home · IS&T' },
-          { path: 'tasks', component: Tasks, title: 'Tasks · IS&T' },
-          { path: 'schedule', component: Schedule, title: 'Schedule · IS&T' },
-          { path: 'inventory', component: Inventory, title: 'Inventory · IS&T' },
-          { path: 'account', component: Account, title: 'Account · IS&T' },
+          { path: 'home', title: 'Home · IS&T', loadComponent: () => import('./pages/home/home').then((m) => m.Home) },
+          { path: 'tasks', title: 'Tasks · IS&T', loadComponent: () => import('./pages/tasks/tasks').then((m) => m.Tasks) },
+          { path: 'schedule', title: 'Schedule · IS&T', loadComponent: () => import('./pages/schedule/schedule').then((m) => m.Schedule) },
+          { path: 'inventory', title: 'Inventory · IS&T', loadComponent: () => import('./pages/inventory/inventory').then((m) => m.Inventory) },
+          { path: 'account', title: 'Account · IS&T', loadComponent: () => import('./pages/account/account').then((m) => m.Account) },
         ],
       },
 

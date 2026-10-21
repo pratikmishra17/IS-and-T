@@ -48,11 +48,30 @@ describe('App routing', () => {
     expect(heading(harness)).toContain('Welcome back.');
   });
 
-  it('shows the home page after logging in', async () => {
+  it('shows a student their day: what’s next, today’s timeline and the week’s hours', async () => {
     await logInAs(student);
     const harness = await RouterTestingHarness.create('/home');
+    const today = new Date().toLocaleDateString('en-CA');
+    await new Promise((resolve) => setTimeout(resolve));
+    http.expectOne('/api/me/today').flush({
+      date: today, holiday: null, dayOff: false, shifts: [{ start: '00:00', end: '23:59', extra: false }],
+      tasks: [{
+        id: 9, type: 'FIX', title: 'Printer offline', description: null, date: today, startTime: '23:30', endTime: '23:59', durationMinutes: 29,
+        building: 'BU', room: '201', employee: { name: 'Pat', email: null, phone: null, department: null }, status: 'ASSIGNED',
+        assignee: { id: 1, name: 'Sam Admin' }, claimedOffShift: false, outcomeNotes: null, finishedAt: null, parentTaskId: null, items: [],
+      }],
+      upForGrabsToday: 2, weekHours: 12, weeklyHourLimit: 20, semesterName: 'Fall 2026', request: null,
+    });
+    await new Promise((resolve) => setTimeout(resolve));
+    await harness.fixture.whenStable();
+    harness.detectChanges();
+    const text = harness.routeNativeElement!.textContent!;
 
-    expect(heading(harness)).toContain('Welcome, Sam.');
+    expect(text).toContain(', Sam.');
+    expect(text).toContain('Next up');
+    expect(text).toContain('Printer offline');
+    expect(text).toContain('of 20');
+    expect(text).toContain('2 tasks need someone');
   });
 
   it('sends visitors to the admin portal to the admin login page', async () => {
@@ -72,6 +91,7 @@ describe('App routing', () => {
     http.expectOne('/api/admin/inventory/items').flush([]);
     http.expectOne('/api/admin/schedule/week').flush({ start: '2026-10-19', days: [], students: [], weeklyHourLimit: null, semesterName: null });
     http.expectOne((request) => request.url === '/api/admin/tasks').flush([]);
+    http.expectOne('/api/admin/time-off/count').flush({ pending: 1 });
     await harness.fixture.whenStable();
     harness.detectChanges();
 
@@ -79,6 +99,7 @@ describe('App routing', () => {
     expect(harness.routeNativeElement?.textContent).toContain('Sam Admin');
     expect(harness.routeNativeElement?.textContent).toContain('Resend link');
     expect(harness.routeNativeElement?.textContent).toContain('No semester covers today');
+    expect(harness.routeNativeElement?.textContent).toContain('1 time-off request to review');
   });
 
   it('shows the stock of each item per room and flags low stock', async () => {
@@ -110,13 +131,14 @@ describe('App routing', () => {
       students: [{
         studentId: 1, name: 'Sam Student', hours: 22, overLimit: true,
         days: days.map((date) => ({
-          date, cancelled: date === '2026-10-20',
+          date, cancelled: date === '2026-10-20', timeOff: date === '2026-10-22' ? [{ start: '10:00', end: '11:00' }] : [],
           shifts: date === '2026-10-19' ? [{ start: '09:00', end: '13:00', extra: false }, { start: '15:00', end: '17:00', extra: true }] : [],
         })),
       }],
     });
     http.expectOne('/api/admin/schedule/requests').flush([]);
     http.expectOne('/api/admin/semesters').flush([]);
+    http.expectOne('/api/admin/time-off').flush([]);
     await harness.fixture.whenStable();
     harness.detectChanges();
     const text = harness.routeNativeElement!.textContent!;
@@ -125,23 +147,33 @@ describe('App routing', () => {
     expect(text).toContain('15:00–17:00');
     expect(text).toContain('Day off');
     expect(text).toContain('Fall Break');
+    expect(text).toContain('Off 10:00–11:00');
     expect(harness.routeNativeElement!.querySelector('td.text-rose-800')?.textContent).toContain('22');
   });
 
   it('lets a student enter class times and preferred hours for a semester', async () => {
     await logInAs(student);
     const harness = await RouterTestingHarness.create('/schedule');
+    await new Promise((resolve) => setTimeout(resolve));
+    http.expectOne('/api/me/week').flush({ start: '2026-10-19', days: [], hours: 0, weeklyHourLimit: 20, semesterName: 'Fall 2026' });
+    await new Promise((resolve) => setTimeout(resolve));
+    http.expectOne('/api/me/time-off').flush([]);
+    await new Promise((resolve) => setTimeout(resolve));
     http.expectOne('/api/me/schedule/semesters').flush([{ id: 5, name: 'Fall 2026', type: 'FALL', startDate: '2026-08-24', endDate: '2026-12-12', weeklyHourLimit: 20, current: true }]);
     await harness.fixture.whenStable();
     http.expectOne((request) => request.url === '/api/me/schedule' && request.params.get('semesterId') === '5').flush({
       studentId: 1, studentName: 'Sam Student', semester: { id: 5, name: 'Fall 2026', type: 'FALL', startDate: '2026-08-24', endDate: '2026-12-12', weeklyHourLimit: 20, current: true },
       classes: [{ day: 'TUESDAY', start: '10:00', end: '11:15' }], preferred: [], shifts: [], weeklyHours: 0, request: null, exceptions: [],
     });
-    // The page loads in two steps (semesters, then that semester's schedule): let both finish.
+    http.expectOne((request) => request.url === '/api/me/schedule/hours').flush([]);
+    // The page loads in steps (week, semesters, then that semester's schedule): let them all finish.
     await new Promise((resolve) => setTimeout(resolve));
     await harness.fixture.whenStable();
     harness.detectChanges();
     const page = harness.routeNativeElement!;
+    page.querySelectorAll<HTMLButtonElement>('[role="tab"]')[1].click(); // "My hours"
+    await harness.fixture.whenStable();
+    harness.detectChanges();
 
     expect(page.textContent).toContain('Not submitted yet');
     expect(page.querySelector<HTMLInputElement>('#class-start-0')!.value).toBe('10:00');
@@ -157,13 +189,24 @@ describe('App routing', () => {
       status: 'ASSIGNED', assignee: { id: 1, name: 'Sam Admin' }, claimedOffShift: false, outcomeNotes: null, finishedAt: null, parentTaskId: null,
       items: [{ id: 3, itemId: 1, itemName: 'Dell P2422H', locationId: 1, locationLabel: 'RT 1408', quantityPlanned: 2, quantityUsed: null, status: 'RESERVED' }],
     };
-    http.expectOne('/api/me/tasks').flush({ upcoming: [task], available: [{ ...task, id: 10, title: 'Fix printer', status: 'UNASSIGNED', assignee: null, items: [] }], recent: [] });
+    await new Promise((resolve) => setTimeout(resolve));
+    http.expectOne('/api/me/tasks').flush({
+      upcoming: [task], available: [{ ...task, id: 10, title: 'Fix printer', status: 'UNASSIGNED', assignee: null, items: [] }],
+      availableDuringMyShifts: [10], recent: [],
+    });
+    await new Promise((resolve) => setTimeout(resolve));
     await harness.fixture.whenStable();
     harness.detectChanges();
-    const text = harness.routeNativeElement!.textContent!;
+    const page = harness.routeNativeElement!;
+    expect(page.textContent).not.toContain('2 × Dell P2422H'); // details start folded
+    [...page.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent?.trim() === 'Details')!.click();
+    await harness.fixture.whenStable();
+    harness.detectChanges();
+    const text = page.textContent!;
 
     expect(text).toContain('New hire setup');
     expect(text).toContain('2 × Dell P2422H');
+    expect(text).toContain('Call 216-555-0100');
     expect(text).toContain('Couldn’t complete');
     expect(text).toContain('Claim this task');
   });
@@ -186,6 +229,29 @@ describe('App routing', () => {
 
     expect(text).toContain('Printer offline');
     expect(text).toContain('1 unassigned');
+  });
+
+  it('lets a student ask for time off for one of that day’s shifts', async () => {
+    await logInAs(student);
+    const harness = await RouterTestingHarness.create('/schedule');
+    await new Promise((resolve) => setTimeout(resolve));
+    http.expectOne('/api/me/week').flush({ start: '2026-10-19', days: [], hours: 0, weeklyHourLimit: null, semesterName: null });
+    await new Promise((resolve) => setTimeout(resolve));
+    http.expectOne('/api/me/time-off').flush([{ id: 3, studentId: 1, studentName: 'Sam', date: '2026-10-20', start: null, end: null,
+      reason: null, status: 'APPROVED', submittedAt: '2026-10-15T12:00:00Z', reviewedAt: null, reviewNote: 'Good luck!', affectedTasks: [] }]);
+    await new Promise((resolve) => setTimeout(resolve));
+    http.expectOne('/api/me/schedule/semesters').flush([]);
+    await harness.fixture.whenStable();
+    harness.detectChanges();
+    const page = harness.routeNativeElement!;
+    page.querySelectorAll<HTMLButtonElement>('[role="tab"]')[2].click(); // "Time off"
+    await harness.fixture.whenStable();
+    harness.detectChanges();
+
+    expect(page.textContent).toContain('Ask for time off');
+    expect(page.textContent).toContain('whole day');
+    expect(page.textContent).toContain('Approved');
+    expect(page.textContent).toContain('Good luck!');
   });
 
   it('groups consecutive holiday days into one row on the calendar page', async () => {

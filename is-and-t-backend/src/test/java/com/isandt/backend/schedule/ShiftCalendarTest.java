@@ -69,6 +69,19 @@ class ShiftCalendarTest {
 		assertThat(calendar.on(7L, monday.plusDays(1)).shifts()).isEmpty();
 	}
 
+	@Test
+	void timeOffIsCutOutOfShiftsSplittingOneInTwoIfNeeded() {
+		List<ShiftCalendar.Shift> shifts = List.of(new ShiftCalendar.Shift(LocalTime.of(9, 0), LocalTime.of(13, 0), false),
+				new ShiftCalendar.Shift(LocalTime.of(14, 0), LocalTime.of(16, 0), false));
+
+		List<ShiftCalendar.Shift> left = ShiftCalendar.cutOut(shifts, List.of(
+				new ShiftCalendar.Window(LocalTime.of(10, 0), LocalTime.of(11, 0)),
+				new ShiftCalendar.Window(LocalTime.of(14, 0), LocalTime.of(16, 0))));
+
+		assertThat(left).containsExactly(new ShiftCalendar.Shift(LocalTime.of(9, 0), LocalTime.of(10, 0), false),
+				new ShiftCalendar.Shift(LocalTime.of(11, 0), LocalTime.of(13, 0), false));
+	}
+
 	private static Student withId(Student student, Long id) {
 		ReflectionTestUtils.setField(student, "id", id);
 		return student;
