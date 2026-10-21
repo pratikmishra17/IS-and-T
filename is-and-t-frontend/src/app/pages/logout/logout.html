@@ -4,15 +4,17 @@
   </div>
   <p class="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-teal-800">Until next time</p>
   <div aria-live="polite" aria-atomic="true">
-    <h1 id="logout-title" class="text-4xl font-semibold tracking-tight text-slate-900">{{ loggedOut() ? 'See you soon.' : 'Ready to leave?' }}</h1>
-    <p class="mt-3 text-sm leading-6 text-slate-600">{{ loggedOut() ? 'You’ve finished the preview. You can return to the login page whenever you like.' : 'Take a break. We’ll be here when you’re ready to return.' }}</p>
+    <h1 id="logout-title" class="text-4xl font-semibold tracking-tight text-slate-900">{{ loggedOut() || !auth.isLoggedIn() ? 'See you soon.' : 'Ready to leave?' }}</h1>
+    <p class="mt-3 text-sm leading-6 text-slate-600">{{ loggedOut() || !auth.isLoggedIn() ? 'You’re logged out. You can log in again whenever you like.' : 'Take a break. We’ll be here when you’re ready to return.' }}</p>
   </div>
+  @if (error()) {
+    <p role="alert" class="mt-6 rounded-2xl bg-rose-50/80 px-4 py-3 text-sm text-rose-900">{{ error() }}</p>
+  }
   <div class="mt-8">
-    @if (loggedOut()) {
-      <button type="button" class="submit-button glass-button" (click)="loginRequested.emit()">Back to login</button>
+    @if (loggedOut() || !auth.isLoggedIn()) {
+      <a routerLink="/login" class="submit-button glass-button">Back to login</a>
     } @else {
-      <button type="button" class="submit-button glass-button" (click)="loggedOut.set(true)">Log out <span aria-hidden="true">→</span></button>
+      <button type="button" class="submit-button glass-button" (click)="logout()">Log out <span aria-hidden="true">→</span></button>
     }
   </div>
-  <p class="mt-5 text-xs leading-5 text-slate-600">UI preview only. No account session is active.</p>
 </section>

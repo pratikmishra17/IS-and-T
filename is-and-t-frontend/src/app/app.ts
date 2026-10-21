@@ -1,17 +1,11 @@
-import { Component, signal } from '@angular/core';
-import { Navbar, Page } from './components/navbar/navbar';
-import { Account } from './pages/account/account';
-import { PageShell } from './components/page-shell/page-shell';
-import { Contact } from './pages/contact/contact';
-import { Login } from './pages/login/login';
-import { Logout } from './pages/logout/logout';
+import { Component } from '@angular/core';
+import { RouterOutlet } from '@angular/router';
 
+/** The root component. Each portal brings its own layout (see app.routes.ts), so this is just the outlet. */
 @Component({
   selector: 'app-root',
-  imports: [PageShell, Navbar, Account, Contact, Login, Logout],
+  imports: [RouterOutlet],
   styleUrl: './app.css',
   templateUrl: './app.html',
 })
-export class App {
-  protected readonly page = signal<Page>('login');
-}
+export class App {}

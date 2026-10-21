@@ -1,0 +1,180 @@
+<h1 class="text-3xl font-semibold tracking-tight text-slate-900">Calendar</h1>
+<p class="mt-1 text-sm text-slate-600">Semesters set each student’s weekly hour limit. Holidays don’t block anything; shifts and tasks on them get a warning.</p>
+
+<!-- Semesters -->
+<section class="glass-panel mt-6 rounded-3xl p-4 sm:p-6" aria-labelledby="semesters-title">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <h2 id="semesters-title" class="text-lg font-semibold text-slate-900">Semesters</h2>
+    <button type="button" class="btn submit-button text-white" (click)="openAddSemester()"><span aria-hidden="true">+</span> Add semester</button>
+  </div>
+
+  @if (loading()) {
+    <p class="py-10 text-center text-sm text-slate-500">Loading…</p>
+  } @else if (semesters().length === 0) {
+    <p class="py-10 text-center text-sm text-slate-600">No semesters yet. Add the current one to set students’ weekly hour limit.</p>
+  } @else {
+    <div class="mt-4 overflow-x-auto">
+      <table class="w-full min-w-[36rem] text-left text-sm">
+        <thead class="border-b border-slate-200/80 text-xs uppercase tracking-wider text-slate-500">
+          <tr>
+            <th scope="col" class="px-3 py-3 font-semibold">Semester</th>
+            <th scope="col" class="px-3 py-3 font-semibold">Dates</th>
+            <th scope="col" class="px-3 py-3 font-semibold">Hours / week</th>
+            <th scope="col" class="px-3 py-3 text-right font-semibold">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-200/60">
+          @for (semester of semesters(); track semester.id) {
+            <tr class="hover:bg-white/40">
+              <td class="px-3 py-3">
+                <span class="font-medium text-slate-900">{{ semester.name }}</span>
+                @if (semester.current) { <span class="badge ml-2 bg-teal-100 text-teal-900">Current</span> }
+              </td>
+              <td class="px-3 py-3 text-slate-700">{{ semester.startDate | date: 'MMM d, y' }} – {{ semester.endDate | date: 'MMM d, y' }}</td>
+              <td class="px-3 py-3 text-slate-700">{{ semester.weeklyHourLimit }} h</td>
+              <td class="px-3 py-3">
+                <div class="flex justify-end gap-0.5">
+                  <button type="button" class="icon-button" [attr.aria-label]="'Edit ' + semester.name" title="Edit" (click)="openEditSemester(semester)">
+                    <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
+                  </button>
+                  <button type="button" class="icon-button hover:text-rose-800" [attr.aria-label]="'Delete ' + semester.name" title="Delete" (click)="deleteSemester(semester)">
+                    <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /></svg>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</section>
+
+<!-- Holidays -->
+<section class="glass-panel mt-6 rounded-3xl p-4 sm:p-6" aria-labelledby="holidays-title">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <h2 id="holidays-title" class="text-lg font-semibold text-slate-900">Holidays</h2>
+    <div class="flex flex-wrap gap-2">
+      <!-- The real file input is hidden; the label is styled as a button and opens it. -->
+      <label class="btn btn-quiet" [class.opacity-60]="importing()">
+        <input type="file" accept=".ics,text/calendar" class="sr-only" [disabled]="importing()" (change)="importFile(fileInput)" #fileInput />
+        {{ importing() ? 'Importing…' : 'Import .ics file' }}
+      </label>
+      <button type="button" class="btn submit-button text-white" (click)="openAddHoliday()"><span aria-hidden="true">+</span> Add holiday</button>
+    </div>
+  </div>
+
+  <label class="mt-3 inline-flex cursor-pointer items-center gap-2 text-sm text-slate-600">
+    <input type="checkbox" class="size-4 accent-teal-800" [ngModel]="showPastHolidays()" (ngModelChange)="showPastHolidays.set($event)" />
+    Show past holidays
+  </label>
+
+  @if (!loading() && holidayGroups().length === 0) {
+    <p class="py-10 text-center text-sm text-slate-600">{{ holidays().length === 0 ? 'No holidays yet. Add them one by one, or import the university’s calendar file.' : 'No upcoming holidays.' }}</p>
+  } @else {
+    <ul class="mt-3 divide-y divide-slate-200/60">
+      @for (group of holidayGroups(); track group.first) {
+        <li class="flex flex-wrap items-center justify-between gap-3 py-3" [class.opacity-60]="group.last < today">
+          <div class="flex items-center gap-4">
+            <div class="brand-mark flex w-14 shrink-0 flex-col items-center rounded-xl py-1.5 text-center">
+              <span class="text-[0.65rem] font-semibold uppercase tracking-widest text-teal-800">{{ group.first | date: 'MMM' }}</span>
+              <span class="text-lg font-semibold leading-tight text-slate-900">{{ group.first | date: 'd' }}</span>
+            </div>
+            <div>
+              <p class="font-medium text-slate-900">{{ group.name }}</p>
+              <p class="text-sm text-slate-500">
+                @if (dayCount(group) === 1) {
+                  {{ group.first | date: 'EEEE, MMMM d, y' }}
+                } @else {
+                  {{ group.first | date: 'EEE, MMM d' }} – {{ group.last | date: 'EEE, MMM d, y' }} · {{ dayCount(group) }} days
+                }
+                @if (group.imported) { <span class="badge ml-1 bg-slate-200/70 text-slate-600">Imported</span> }
+              </p>
+            </div>
+          </div>
+          <button type="button" class="icon-button hover:text-rose-800" [attr.aria-label]="'Delete ' + group.name" title="Delete" (click)="deleteHoliday(group)">
+            <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /></svg>
+          </button>
+        </li>
+      }
+    </ul>
+  }
+</section>
+
+<app-side-panel [open]="semesterPanelOpen()" [title]="editingSemester() ? 'Edit ' + editingSemester()!.name : 'Add a semester'" (closed)="semesterPanelOpen.set(false)">
+  @if (semesterPanelOpen()) {
+    <form #semesterForm="ngForm" (ngSubmit)="saveSemester(semesterForm)" class="space-y-5" novalidate>
+      <div>
+        <label for="semester-name" class="field-label">Name</label>
+        <input id="semester-name" name="name" [(ngModel)]="semesterDraft.name" #name="ngModel" required maxlength="100" placeholder="Fall 2026" class="glass-input w-full rounded-xl px-3 py-2.5 text-sm" [attr.aria-invalid]="name.invalid && (name.touched || semesterForm.submitted)" />
+      </div>
+      <div class="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label for="semester-type" class="field-label">Type</label>
+          <select id="semester-type" name="type" [ngModel]="semesterDraft.type" (ngModelChange)="typeChanged($event)" class="glass-input w-full rounded-xl px-3 py-2.5 text-sm">
+            <option value="FALL">Fall</option>
+            <option value="SPRING">Spring</option>
+            <option value="SUMMER">Summer</option>
+          </select>
+        </div>
+        <div>
+          <label for="semester-limit" class="field-label">Weekly hour limit</label>
+          <input id="semester-limit" name="weeklyHourLimit" type="number" [(ngModel)]="semesterDraft.weeklyHourLimit" #limit="ngModel" required min="1" max="80" class="glass-input w-full rounded-xl px-3 py-2.5 text-sm" [attr.aria-invalid]="limit.invalid && (limit.touched || semesterForm.submitted)" />
+        </div>
+      </div>
+      <div class="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label for="semester-start" class="field-label">First day</label>
+          <input id="semester-start" name="startDate" type="date" [(ngModel)]="semesterDraft.startDate" #start="ngModel" required class="glass-input w-full rounded-xl px-3 py-2.5 text-sm" [attr.aria-invalid]="start.invalid && (start.touched || semesterForm.submitted)" />
+        </div>
+        <div>
+          <label for="semester-end" class="field-label">Last day</label>
+          <input id="semester-end" name="endDate" type="date" [(ngModel)]="semesterDraft.endDate" #end="ngModel" required [min]="semesterDraft.startDate" class="glass-input w-full rounded-xl px-3 py-2.5 text-sm" [attr.aria-invalid]="end.invalid && (end.touched || semesterForm.submitted)" />
+        </div>
+      </div>
+      <p class="text-xs leading-5 text-slate-500">Fall and Spring usually allow 20 hours a week, Summer 40. Semesters can’t overlap.</p>
+      @if (semesterForm.invalid && semesterForm.submitted) {
+        <p class="text-sm text-rose-800">Please fill in every field; the hour limit must be between 1 and 80.</p>
+      }
+      @if (formError()) {
+        <p role="alert" class="rounded-2xl bg-rose-50/90 px-4 py-3 text-sm text-rose-900">{{ formError() }}</p>
+      }
+      <div class="flex justify-end gap-2 pt-2">
+        <button type="button" class="btn btn-quiet" (click)="semesterPanelOpen.set(false)">Cancel</button>
+        <button type="submit" class="btn submit-button text-white" [disabled]="saving()">{{ saving() ? 'Saving…' : (editingSemester() ? 'Save changes' : 'Add semester') }}</button>
+      </div>
+    </form>
+  }
+</app-side-panel>
+
+<app-side-panel [open]="holidayPanelOpen()" title="Add a holiday" (closed)="holidayPanelOpen.set(false)">
+  @if (holidayPanelOpen()) {
+    <form #holidayForm="ngForm" (ngSubmit)="saveHoliday(holidayForm)" class="space-y-5" novalidate>
+      <div>
+        <label for="holiday-name" class="field-label">Name</label>
+        <input id="holiday-name" name="name" [(ngModel)]="holidayDraft.name" #holidayName="ngModel" required maxlength="200" placeholder="Thanksgiving Break" class="glass-input w-full rounded-xl px-3 py-2.5 text-sm" [attr.aria-invalid]="holidayName.invalid && (holidayName.touched || holidayForm.submitted)" />
+      </div>
+      <div class="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label for="holiday-from" class="field-label">Date</label>
+          <input id="holiday-from" name="from" type="date" [(ngModel)]="holidayDraft.from" #from="ngModel" required class="glass-input w-full rounded-xl px-3 py-2.5 text-sm" [attr.aria-invalid]="from.invalid && (from.touched || holidayForm.submitted)" />
+        </div>
+        <div>
+          <label for="holiday-to" class="field-label">Last day <span class="font-normal text-slate-500">(optional)</span></label>
+          <input id="holiday-to" name="to" type="date" [(ngModel)]="holidayDraft.to" [min]="holidayDraft.from" class="glass-input w-full rounded-xl px-3 py-2.5 text-sm" />
+        </div>
+      </div>
+      <p class="text-xs leading-5 text-slate-500">Leave “Last day” empty for a single day. For a break, every day from the date to the last day becomes a holiday.</p>
+      @if (holidayForm.invalid && holidayForm.submitted) {
+        <p class="text-sm text-rose-800">Please give the holiday a name and a date.</p>
+      }
+      @if (formError()) {
+        <p role="alert" class="rounded-2xl bg-rose-50/90 px-4 py-3 text-sm text-rose-900">{{ formError() }}</p>
+      }
+      <div class="flex justify-end gap-2 pt-2">
+        <button type="button" class="btn btn-quiet" (click)="holidayPanelOpen.set(false)">Cancel</button>
+        <button type="submit" class="btn submit-button text-white" [disabled]="saving()">{{ saving() ? 'Saving…' : 'Add holiday' }}</button>
+      </div>
+    </form>
+  }
+</app-side-panel>

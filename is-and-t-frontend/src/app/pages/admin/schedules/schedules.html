@@ -1,0 +1,190 @@
+<div class="flex flex-wrap items-end justify-between gap-4">
+  <div>
+    <h1 class="text-3xl font-semibold tracking-tight text-slate-900">Schedules</h1>
+    <p class="mt-1 text-sm text-slate-600">Who works when. Click a name to plan their weekly shifts, give a day off, or add an extra shift.</p>
+  </div>
+</div>
+
+<div role="tablist" aria-label="Schedules" class="mt-6 inline-flex gap-1 rounded-2xl border border-white/60 bg-white/30 p-1">
+  <button type="button" role="tab" class="rounded-xl px-4 py-2 text-sm font-medium text-slate-700 hover:bg-white/60" [class.bg-white]="tab() === 'week'" [class.shadow-sm]="tab() === 'week'" [attr.aria-selected]="tab() === 'week'" (click)="tab.set('week')">Team week</button>
+  <button type="button" role="tab" class="rounded-xl px-4 py-2 text-sm font-medium text-slate-700 hover:bg-white/60" [class.bg-white]="tab() === 'requests'" [class.shadow-sm]="tab() === 'requests'" [attr.aria-selected]="tab() === 'requests'" (click)="tab.set('requests')">
+    Requests @if (requests().length > 0) { <span class="badge ml-1 bg-amber-100 text-amber-900">{{ requests().length }}</span> }
+  </button>
+</div>
+
+<section class="glass-panel mt-4 rounded-3xl p-4 sm:p-6">
+  @if (loading()) {
+    <p class="py-12 text-center text-sm text-slate-500">Loading…</p>
+  } @else if (tab() === 'week') {
+    @if (week(); as w) {
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p class="font-semibold text-slate-900">{{ w.start | date: 'MMM d' }} – {{ friday() | date: 'MMM d, y' }}</p>
+          <p class="text-sm text-slate-500">{{ w.semesterName ? w.semesterName + ' · limit ' + w.weeklyHourLimit + ' h a week' : 'Not in a semester: only extra shifts apply' }}</p>
+        </div>
+        <div class="flex gap-1">
+          <button type="button" class="btn btn-quiet px-3 py-2" aria-label="Previous week" (click)="moveWeek(-1)">←</button>
+          <button type="button" class="btn btn-quiet px-3 py-2" (click)="moveWeek(0)">This week</button>
+          <button type="button" class="btn btn-quiet px-3 py-2" aria-label="Next week" (click)="moveWeek(1)">→</button>
+        </div>
+      </div>
+
+      @if (w.students.length === 0) {
+        <p class="py-12 text-center text-sm text-slate-600">No active students yet. Add them on the Users page.</p>
+      } @else {
+        <div class="mt-4 overflow-x-auto">
+          <table class="w-full min-w-[52rem] table-fixed text-left text-sm">
+            <thead class="text-xs uppercase tracking-wider text-slate-500">
+              <tr class="border-b border-slate-200/80">
+                <th scope="col" class="w-44 px-3 py-3 font-semibold">Student</th>
+                @for (day of w.days; track day.date) {
+                  <th scope="col" class="px-2 py-3 font-semibold" [class.text-teal-900]="day.date === today">
+                    {{ day.date | date: 'EEE d' }}
+                    @if (day.holiday) { <span class="badge mt-1 block w-fit bg-rose-100 normal-case tracking-normal text-rose-900" [title]="day.holiday">{{ day.holiday }}</span> }
+                  </th>
+                }
+                <th scope="col" class="w-20 px-3 py-3 text-right font-semibold">Hours</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-200/60">
+              @for (row of w.students; track row.studentId) {
+                <tr class="align-top hover:bg-white/30">
+                  <th scope="row" class="px-3 py-2.5 font-medium">
+                    <button type="button" class="cursor-pointer text-left text-teal-950 hover:underline" (click)="openStudent(row.studentId, row.name)">{{ row.name }}</button>
+                  </th>
+                  @for (day of row.days; track day.date) {
+                    <td class="px-2 py-2.5" [class.bg-teal-50]="day.date === today">
+                      <div class="flex flex-col gap-1">
+                        @if (day.cancelled) { <span class="badge w-fit bg-slate-200 text-slate-600">Day off</span> }
+                        @for (shift of day.shifts; track shift.start) {
+                          <span class="w-fit rounded-lg px-2 py-0.5 text-xs font-medium" [class]="shift.extra ? 'border border-dashed border-teal-600 text-teal-900' : 'bg-teal-100/80 text-teal-950'">{{ shift.start }}–{{ shift.end }}</span>
+                        }
+                      </div>
+                    </td>
+                  }
+                  <td class="px-3 py-2.5 text-right font-semibold" [class.text-rose-800]="row.overLimit" [class.text-slate-900]="!row.overLimit">
+                    {{ row.hours }}@if (w.weeklyHourLimit) { <span class="font-normal text-slate-400"> / {{ w.weeklyHourLimit }}</span> }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        <p class="mt-3 text-xs text-slate-500">Solid: weekly shift · dashed: extra shift for that day only · red hours: over the weekly limit.</p>
+      }
+    }
+  } @else {
+    @if (requests().length === 0) {
+      <p class="py-12 text-center text-sm text-slate-600">No requests waiting. Students submit their hours from their Schedule page.</p>
+    } @else {
+      <ul class="divide-y divide-slate-200/60">
+        @for (request of requests(); track request.id) {
+          <li class="flex flex-wrap items-center justify-between gap-3 py-3">
+            <div>
+              <p class="font-medium text-slate-900">{{ request.studentName }}</p>
+              <p class="text-sm text-slate-500">{{ request.semesterName }} · submitted {{ request.submittedAt | date: 'MMM d, h:mm a' }}</p>
+            </div>
+            <button type="button" class="btn submit-button text-white" (click)="openStudent(request.studentId, request.studentName, request.semesterId, request.id)">Review</button>
+          </li>
+        }
+      </ul>
+    }
+  }
+</section>
+
+<app-side-panel [open]="!!panelStudent()" [title]="(panelRequestId() ? 'Review: ' : '') + (panelStudent()?.name ?? '')" (closed)="closePanel()">
+  @if (panelStudent()) {
+    <div class="space-y-6">
+      <div>
+        <label for="panel-semester" class="field-label">Semester</label>
+        <select id="panel-semester" class="glass-input w-full rounded-xl px-3 py-2.5 text-sm" [disabled]="!!panelRequestId()" [ngModel]="panelSemesterId()" (ngModelChange)="loadPanel($event)">
+          @for (semester of semesters(); track semester.id) { <option [ngValue]="semester.id">{{ semester.name }} · {{ semester.weeklyHourLimit }} h/week</option> }
+        </select>
+      </div>
+
+      @if (panel(); as p) {
+        <div>
+          <h3 class="text-sm font-semibold uppercase tracking-widest text-slate-500">Classes</h3>
+          @if (p.classes.length === 0) { <p class="mt-1 text-sm text-slate-500">None entered.</p> }
+          <div class="mt-2 flex flex-wrap gap-1">
+            @for (block of p.classes; track $index) { <span class="badge bg-slate-200/80 text-slate-700">{{ dayName(block.day).slice(0, 3) }} {{ block.start }}–{{ block.end }}</span> }
+          </div>
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-semibold uppercase tracking-widest text-slate-500">Asked for</h3>
+            @if (p.preferred.length > 0) { <button type="button" class="text-sm font-medium text-teal-900 hover:underline" (click)="usePreferred()">Use these as shifts</button> }
+          </div>
+          @if (p.preferred.length === 0) { <p class="mt-1 text-sm text-slate-500">Nothing submitted.</p> }
+          <div class="mt-2 flex flex-wrap gap-1">
+            @for (block of p.preferred; track $index) { <span class="badge bg-amber-100/80 text-amber-950">{{ dayName(block.day).slice(0, 3) }} {{ block.start }}–{{ block.end }}</span> }
+          </div>
+        </div>
+
+        <div>
+          <h3 class="text-sm font-semibold uppercase tracking-widest text-slate-500">Weekly shifts</h3>
+          <div class="mt-2"><app-time-blocks-editor [(blocks)]="shifts" [weekdaysOnly]="true" addLabel="Add a shift" emptyText="No shifts." idPrefix="shift" /></div>
+          @if (shiftHours() > p.semester.weeklyHourLimit) {
+            <p class="mt-2 text-sm text-amber-800">{{ shiftHours() }} h is over the {{ p.semester.weeklyHourLimit }} h limit. You can still save.</p>
+          }
+          <button type="button" class="btn submit-button mt-3 w-full text-white" [disabled]="saving()" (click)="saveShifts()">
+            {{ saving() ? 'Saving…' : (panelRequestId() ? 'Approve and email ' + p.studentName.split(' ')[0] : 'Save shifts') }}
+          </button>
+        </div>
+
+        @if (warnings().length > 0) {
+          <ul role="status" class="space-y-1 rounded-2xl bg-amber-50/90 px-4 py-3 text-sm text-amber-950">
+            @for (warning of warnings(); track $index) { <li>⚠ {{ warning }}</li> }
+          </ul>
+        }
+        @if (panelError()) { <p role="alert" class="rounded-2xl bg-rose-50/90 px-4 py-3 text-sm text-rose-900">{{ panelError() }}</p> }
+
+        <div class="border-t border-slate-200/70 pt-5">
+          <h3 class="text-sm font-semibold uppercase tracking-widest text-slate-500">One-off changes</h3>
+          @if (p.exceptions.length === 0) { <p class="mt-1 text-sm text-slate-500">None this semester.</p> }
+          <ul class="mt-2 divide-y divide-slate-200/60">
+            @for (change of p.exceptions; track change.id) {
+              <li class="flex items-center justify-between gap-2 py-2 text-sm">
+                <span>
+                  <span class="font-medium text-slate-800">{{ change.date | date: 'EEE, MMM d' }}</span>:
+                  {{ change.type === 'CANCEL' ? 'day off' : 'extra ' + change.start + '–' + change.end }}
+                  @if (change.reason) { <span class="text-slate-500">({{ change.reason }})</span> }
+                </span>
+                <button type="button" class="icon-button" [attr.aria-label]="'Delete the change on ' + change.date" (click)="deleteChange(change)">✕</button>
+              </li>
+            }
+          </ul>
+          <form #changeForm="ngForm" (ngSubmit)="addChange(changeForm)" class="mt-3 space-y-3 rounded-2xl border border-white/70 bg-white/40 p-3" novalidate>
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label for="change-date" class="field-label">Date</label>
+                <input id="change-date" name="date" type="date" [(ngModel)]="change.date" required class="glass-input w-full rounded-xl px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label for="change-type" class="field-label">Change</label>
+                <select id="change-type" name="type" [(ngModel)]="change.type" class="glass-input w-full rounded-xl px-3 py-2 text-sm">
+                  <option value="CANCEL">Day off</option>
+                  <option value="EXTRA">Extra shift</option>
+                </select>
+              </div>
+            </div>
+            @if (change.type === 'EXTRA') {
+              <div class="grid grid-cols-2 gap-2">
+                <div><label for="change-start" class="field-label">From</label><input id="change-start" name="start" type="time" [(ngModel)]="change.start" required class="glass-input w-full rounded-xl px-3 py-2 text-sm" /></div>
+                <div><label for="change-end" class="field-label">To</label><input id="change-end" name="end" type="time" [(ngModel)]="change.end" required class="glass-input w-full rounded-xl px-3 py-2 text-sm" /></div>
+              </div>
+            }
+            <div>
+              <label for="change-reason" class="field-label">Reason <span class="font-normal text-slate-500">(optional)</span></label>
+              <input id="change-reason" name="reason" [(ngModel)]="change.reason" maxlength="255" placeholder="Exam, sick, covering for Rita…" class="glass-input w-full rounded-xl px-3 py-2 text-sm" />
+            </div>
+            <button type="submit" class="btn btn-quiet w-full" [disabled]="saving()">Add change</button>
+          </form>
+        </div>
+      } @else if (!panelError()) {
+        <p class="text-sm text-slate-500">Loading…</p>
+      }
+    </div>
+  }
+</app-side-panel>

@@ -1,0 +1,122 @@
+<ng-template #details let-task>
+  <p class="text-xs font-semibold uppercase tracking-widest text-teal-800">{{ task.date | date: 'EEE, MMM d' }} · {{ task.startTime }}–{{ task.endTime }}</p>
+  <p class="mt-1 font-semibold text-slate-900">{{ task.title }}</p>
+  <p class="text-sm text-slate-600">{{ task.type === 'DEPLOYMENT' ? 'Deployment' : 'Fix' }} · {{ task.building }} {{ task.room }}</p>
+  <p class="mt-2 text-sm text-slate-700">
+    {{ task.employee.name }}@if (task.employee.department) { · {{ task.employee.department }} }
+    @if (task.employee.phone) { · <a class="text-teal-900 underline" [href]="'tel:' + task.employee.phone">{{ task.employee.phone }}</a> }
+    @if (task.employee.email) { · <a class="text-teal-900 underline" [href]="'mailto:' + task.employee.email">email</a> }
+  </p>
+  @if (task.description) { <p class="mt-2 whitespace-pre-line text-sm text-slate-600">{{ task.description }}</p> }
+  @if (task.items.length > 0) {
+    <ul class="mt-2 text-sm text-slate-700">
+      @for (item of task.items; track item.id) { <li>• {{ item.quantityPlanned }} × {{ item.itemName }} <span class="text-slate-500">from {{ item.locationLabel }}</span></li> }
+    </ul>
+  }
+</ng-template>
+
+<section class="glass-panel rounded-[2rem] p-7 sm:p-10" aria-labelledby="tasks-title">
+  <p class="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-teal-800">Deployments and fixes</p>
+  <h1 id="tasks-title" class="text-4xl font-semibold tracking-tight text-slate-900">My tasks.</h1>
+
+  @if (!tasks()) {
+    <p class="mt-6 text-sm text-slate-600">Loading…</p>
+  } @else {
+    <h2 class="mt-8 text-sm font-semibold uppercase tracking-widest text-slate-500">Yours ({{ tasks()!.upcoming.length }})</h2>
+    @if (tasks()!.upcoming.length === 0) { <p class="mt-2 text-sm text-slate-600">Nothing assigned to you right now.</p> }
+    <ul class="mt-3 space-y-3">
+      @for (task of tasks()!.upcoming; track task.id) {
+        <li class="rounded-2xl border border-white/70 bg-white/50 p-4">
+          <ng-container *ngTemplateOutlet="details; context: { $implicit: task }" />
+          <div class="mt-3 grid grid-cols-2 gap-2">
+            <button type="button" class="btn submit-button text-white" [disabled]="busyId() === task.id" (click)="openComplete(task)">Complete</button>
+            <button type="button" class="btn btn-quiet" [disabled]="busyId() === task.id" (click)="openNotCompleted(task)">Couldn’t complete</button>
+            <button type="button" class="btn btn-quiet" [disabled]="busyId() === task.id" (click)="openHandOff(task)">Hand off</button>
+            <button type="button" class="btn btn-quiet" [disabled]="busyId() === task.id" (click)="optOut(task)">Opt out</button>
+          </div>
+        </li>
+      }
+    </ul>
+
+    <h2 class="mt-8 text-sm font-semibold uppercase tracking-widest text-slate-500">Up for grabs ({{ tasks()!.available.length }})</h2>
+    @if (tasks()!.available.length === 0) { <p class="mt-2 text-sm text-slate-600">No unassigned tasks.</p> }
+    <ul class="mt-3 space-y-3">
+      @for (task of tasks()!.available; track task.id) {
+        <li class="rounded-2xl border border-amber-200 bg-amber-50/60 p-4">
+          <ng-container *ngTemplateOutlet="details; context: { $implicit: task }" />
+          <button type="button" class="btn submit-button mt-3 w-full text-white" [disabled]="busyId() === task.id" (click)="claim(task)">Claim this task</button>
+        </li>
+      }
+    </ul>
+
+    @if (tasks()!.recent.length > 0) {
+      <h2 class="mt-8 text-sm font-semibold uppercase tracking-widest text-slate-500">Finished in the last two weeks</h2>
+      <ul class="mt-3 divide-y divide-slate-200/70">
+        @for (task of tasks()!.recent; track task.id) {
+          <li class="flex justify-between gap-3 py-2 text-sm">
+            <span class="text-slate-700">{{ task.date | date: 'MMM d' }} · {{ task.title }}</span>
+            <span class="shrink-0 font-medium" [class.text-teal-800]="task.status === 'COMPLETED'" [class.text-slate-500]="task.status !== 'COMPLETED'">{{ task.status === 'COMPLETED' ? 'Completed' : 'Not completed' }}</span>
+          </li>
+        }
+      </ul>
+    }
+  }
+</section>
+
+<app-side-panel [open]="!!panel()" [title]="panelTitle()" (closed)="panel.set(null)">
+  @if (panel(); as p) {
+    <div class="space-y-4">
+      <p class="font-medium text-slate-900">{{ p.task.title }}</p>
+      @switch (p.mode) {
+        @case ('complete') {
+          @if (p.task.items.length > 0) {
+            <fieldset>
+              <legend class="field-label">How many did you use?</legend>
+              <div class="space-y-2">
+                @for (item of p.task.items; track item.id) {
+                  @if (item.status === 'RESERVED') {
+                    <label class="flex items-center justify-between gap-3 text-sm text-slate-700">
+                      <span>{{ item.itemName }} <span class="text-slate-500">(planned {{ item.quantityPlanned }})</span></span>
+                      <input type="number" min="0" [max]="item.quantityPlanned" class="glass-input w-20 rounded-xl px-2 py-1.5 text-sm" [(ngModel)]="used[item.id]" [name]="'used-' + item.id" />
+                    </label>
+                  }
+                }
+              </div>
+              <p class="mt-2 text-xs text-slate-500">If you used fewer than planned, the rest is recorded as owed to the employee so an admin can follow up.</p>
+            </fieldset>
+          }
+          <div>
+            <label for="complete-notes" class="field-label">Notes <span class="font-normal text-slate-500">(optional)</span></label>
+            <textarea id="complete-notes" rows="3" maxlength="2000" class="glass-input w-full rounded-xl px-3 py-2 text-sm" [(ngModel)]="notes" name="notes"></textarea>
+          </div>
+        }
+        @case ('not-completed') {
+          <div>
+            <label for="not-completed-notes" class="field-label">What happened?</label>
+            <textarea id="not-completed-notes" rows="4" maxlength="2000" required placeholder="The employee wasn’t there; the room was locked…" class="glass-input w-full rounded-xl px-3 py-2 text-sm" [(ngModel)]="notes" name="notes"></textarea>
+          </div>
+        }
+        @case ('hand-off') {
+          @if (colleagues.length === 0) {
+            <p class="text-sm text-slate-600">Nobody else is on shift for the whole task and free then. You can opt out instead, so the others are asked to claim it.</p>
+          } @else {
+            <div>
+              <label for="hand-off-to" class="field-label">Give it to</label>
+              <select id="hand-off-to" class="glass-input w-full rounded-xl px-3 py-2.5 text-sm" [(ngModel)]="handOffTo" name="handOffTo">
+                @for (c of colleagues; track c.id) { <option [ngValue]="c.id">{{ c.name }}</option> }
+              </select>
+              <p class="mt-1 text-xs text-slate-500">Only colleagues on shift for the whole task and free then are listed. They’ll be emailed.</p>
+            </div>
+          }
+        }
+      }
+      @if (panelError()) { <p role="alert" class="rounded-2xl bg-rose-50/90 px-4 py-3 text-sm text-rose-900">{{ panelError() }}</p> }
+      <div class="flex justify-end gap-2">
+        <button type="button" class="btn btn-quiet" (click)="panel.set(null)">Cancel</button>
+        <button type="button" class="btn submit-button text-white" [disabled]="busyId() === p.task.id || (p.mode === 'hand-off' && handOffTo === null) || (p.mode === 'not-completed' && !notes.trim())" (click)="submitPanel()">
+          {{ p.mode === 'complete' ? 'Mark completed' : p.mode === 'not-completed' ? 'Record' : 'Hand off' }}
+        </button>
+      </div>
+    </div>
+  }
+</app-side-panel>

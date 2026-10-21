@@ -88,3 +88,73 @@ button, input, textarea {
     @apply cursor-pointer rounded-lg px-3 py-2 text-sm font-medium text-teal-900 hover:bg-white/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-800;
   }
 }
+
+/* ---- Shared admin UI: buttons, badges, dialogs ---- */
+
+.danger-button {
+  background: linear-gradient(160deg, #be123c, #9f1239);
+  border: 1px solid #9f1239;
+}
+
+.danger-button:hover {
+  background: linear-gradient(160deg, #9f1239, #881337);
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-800 disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .btn-quiet {
+    @apply border border-white/80 bg-white/50 text-teal-900 hover:bg-white/80;
+  }
+
+  .icon-button {
+    @apply inline-flex size-9 cursor-pointer items-center justify-center rounded-lg text-slate-600 hover:bg-white/80 hover:text-teal-900 focus-visible:outline-2 focus-visible:outline-teal-800 disabled:cursor-not-allowed disabled:opacity-40;
+  }
+
+  .badge {
+    @apply inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-semibold;
+  }
+
+  .field-label {
+    @apply mb-1.5 block text-sm font-medium text-slate-700;
+  }
+}
+
+/* Native <dialog> elements (ConfirmDialog, SidePanel) */
+.app-dialog {
+  color: #0f172a;
+  background: #f4f8f6f2;
+  border: 1px solid #ffffff;
+  box-shadow: 0 30px 80px -20px #1e3a3a55;
+}
+
+.app-dialog::backdrop {
+  background: #0f172a59;
+  backdrop-filter: blur(3px);
+}
+
+.side-panel {
+  margin: 0 0 0 auto;
+  width: min(30rem, 100vw);
+  height: 100dvh;
+  max-height: 100dvh;
+  border-radius: 1.75rem 0 0 1.75rem;
+}
+
+.side-panel[open] {
+  animation: slide-in 200ms ease-out;
+}
+
+@keyframes slide-in {
+  from {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .side-panel[open] {
+    animation: none;
+  }
+}

@@ -1,0 +1,150 @@
+<div class="flex flex-wrap items-end justify-between gap-4">
+  <div>
+    <h1 class="text-3xl font-semibold tracking-tight text-slate-900">Users</h1>
+    <p class="mt-1 text-sm text-slate-600">Everyone who can log in. Adding someone emails them a link to set their password.</p>
+  </div>
+  <button type="button" class="btn submit-button text-white" (click)="openAdd()">
+    <span aria-hidden="true">+</span> {{ isStudents() ? 'Add student' : 'Add admin' }}
+  </button>
+</div>
+
+<section class="glass-panel mt-6 rounded-3xl p-4 sm:p-6" aria-label="Accounts">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <div role="tablist" aria-label="Account type" class="inline-flex gap-1 rounded-2xl border border-white/60 bg-white/30 p-1">
+      <button type="button" role="tab" class="rounded-xl px-4 py-2 text-sm font-medium text-slate-700 hover:bg-white/60" [class.bg-white]="isStudents()" [class.shadow-sm]="isStudents()" [attr.aria-selected]="isStudents()" (click)="switchTab('students')">Students <span class="text-slate-500">{{ accounts().students.length }}</span></button>
+      <button type="button" role="tab" class="rounded-xl px-4 py-2 text-sm font-medium text-slate-700 hover:bg-white/60" [class.bg-white]="!isStudents()" [class.shadow-sm]="!isStudents()" [attr.aria-selected]="!isStudents()" (click)="switchTab('admins')">Admins <span class="text-slate-500">{{ accounts().admins.length }}</span></button>
+    </div>
+    <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+      <label class="sr-only" for="user-search">Search</label>
+      <input id="user-search" type="search" class="glass-input w-full rounded-xl px-3 py-2 text-sm sm:w-64" [placeholder]="isStudents() ? 'Search name, email or ID' : 'Search name or email'" [ngModel]="search()" (ngModelChange)="search.set($event)" />
+      <label class="sr-only" for="user-status">Status</label>
+      <select id="user-status" class="glass-input w-full rounded-xl px-3 py-2 text-sm sm:w-auto" [ngModel]="statusFilter()" (ngModelChange)="statusFilter.set($event)">
+        <option value="all">All statuses</option>
+        <option value="active">Active</option>
+        <option value="no-password">Waiting for password</option>
+        <option value="disabled">Disabled</option>
+      </select>
+    </div>
+  </div>
+
+  @if (loading()) {
+    <p class="py-12 text-center text-sm text-slate-500">Loading…</p>
+  } @else if (rows().length === 0) {
+    <div class="py-12 text-center">
+      <p class="font-medium text-slate-700">{{ accounts()[tab()].length === 0 ? (isStudents() ? 'No students yet.' : 'No admins yet.') : 'Nobody matches your search.' }}</p>
+      @if (accounts()[tab()].length === 0) {
+        <button type="button" class="btn btn-quiet mt-4" (click)="openAdd()">{{ isStudents() ? 'Add the first student' : 'Add an admin' }}</button>
+      }
+    </div>
+  } @else {
+    <div class="mt-4 overflow-x-auto">
+      <table class="w-full min-w-[40rem] text-left text-sm">
+        <thead class="border-b border-slate-200/80 text-xs uppercase tracking-wider text-slate-500">
+          <tr>
+            <th scope="col" class="px-3 py-3 font-semibold" [attr.aria-sort]="ariaSort('name')">
+              <button type="button" class="inline-flex cursor-pointer items-center gap-1 uppercase hover:text-teal-900" (click)="sortBy('name')">Name @if (sortKey() === 'name') { <span aria-hidden="true">{{ sortAscending() ? '↑' : '↓' }}</span> }</button>
+            </th>
+            @if (isStudents()) {
+              <th scope="col" class="px-3 py-3 font-semibold" [attr.aria-sort]="ariaSort('studentId')">
+                <button type="button" class="inline-flex cursor-pointer items-center gap-1 uppercase hover:text-teal-900" (click)="sortBy('studentId')">Student ID @if (sortKey() === 'studentId') { <span aria-hidden="true">{{ sortAscending() ? '↑' : '↓' }}</span> }</button>
+              </th>
+            }
+            <th scope="col" class="px-3 py-3 font-semibold" [attr.aria-sort]="ariaSort('status')">
+              <button type="button" class="inline-flex cursor-pointer items-center gap-1 uppercase hover:text-teal-900" (click)="sortBy('status')">Status @if (sortKey() === 'status') { <span aria-hidden="true">{{ sortAscending() ? '↑' : '↓' }}</span> }</button>
+            </th>
+            <th scope="col" class="px-3 py-3 text-right font-semibold">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-200/60">
+          @for (account of rows(); track account.id) {
+            <tr class="hover:bg-white/40">
+              <td class="px-3 py-3">
+                <p class="font-medium text-slate-900">{{ account.firstName }} {{ account.lastName }} @if (isMe(account)) { <span class="font-normal text-slate-500">(you)</span> }</p>
+                <p class="text-slate-500">{{ account.email }}</p>
+              </td>
+              @if (isStudents()) {
+                <td class="px-3 py-3 font-mono text-slate-700" [class.text-amber-800]="account.studentId?.startsWith('MISSING')">{{ account.studentId }}</td>
+              }
+              <td class="px-3 py-3">
+                @switch (statusOf(account)) {
+                  @case ('active') { <span class="badge bg-teal-100 text-teal-900">Active</span> }
+                  @case ('no-password') { <span class="badge bg-amber-100 text-amber-900">Waiting for password</span> }
+                  @case ('disabled') { <span class="badge bg-slate-200 text-slate-700">Disabled</span> }
+                }
+              </td>
+              <td class="px-3 py-3">
+                <div class="flex justify-end gap-0.5">
+                  <button type="button" class="icon-button" [attr.aria-label]="'Edit ' + account.firstName" title="Edit" [disabled]="busyId() === account.id" (click)="openEdit(account)">
+                    <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
+                  </button>
+                  @if (account.status === 'ACTIVE') {
+                    <button type="button" class="icon-button" [attr.aria-label]="'Email ' + account.firstName + ' a set-password link'" title="Send set-password link" [disabled]="busyId() === account.id" (click)="sendLink(account)">
+                      <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM22 6l-10 7L2 6" /></svg>
+                    </button>
+                  }
+                  @if (!isMe(account)) {
+                    @if (account.status === 'ACTIVE') {
+                      <button type="button" class="icon-button" [attr.aria-label]="'Disable ' + account.firstName" title="Disable" [disabled]="busyId() === account.id" (click)="disable(account)">
+                        <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9" /><path d="m5.6 5.6 12.8 12.8" /></svg>
+                      </button>
+                    } @else {
+                      <button type="button" class="icon-button" [attr.aria-label]="'Enable ' + account.firstName" title="Enable" [disabled]="busyId() === account.id" (click)="enable(account)">
+                        <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="m8 12 3 3 5-6" /></svg>
+                      </button>
+                    }
+                    <button type="button" class="icon-button hover:text-rose-800" [attr.aria-label]="'Remove ' + account.firstName" title="Remove" [disabled]="busyId() === account.id" (click)="remove(account)">
+                      <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /></svg>
+                    </button>
+                  }
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</section>
+
+<app-side-panel [open]="panelOpen()" [title]="editing() ? 'Edit ' + editing()!.firstName + ' ' + editing()!.lastName : (isStudents() ? 'Add a student' : 'Add an admin')" (closed)="panelOpen.set(false)">
+  @if (panelOpen()) {
+    <form #accountForm="ngForm" (ngSubmit)="save(accountForm)" class="space-y-5" novalidate>
+      @if (!editing()) {
+        <p class="text-sm leading-6 text-slate-600">They’ll get an email from the IS&amp;T portal with a link to set their password{{ isStudents() ? '' : ' and log in to the admin portal' }}.</p>
+      }
+      <div class="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label for="account-first-name" class="field-label">First name</label>
+          <input id="account-first-name" name="firstName" [(ngModel)]="draft.firstName" #firstName="ngModel" required maxlength="100" class="glass-input w-full rounded-xl px-3 py-2.5 text-sm" [attr.aria-invalid]="firstName.invalid && (firstName.touched || accountForm.submitted)" />
+        </div>
+        <div>
+          <label for="account-last-name" class="field-label">Last name</label>
+          <input id="account-last-name" name="lastName" [(ngModel)]="draft.lastName" #lastName="ngModel" required maxlength="100" class="glass-input w-full rounded-xl px-3 py-2.5 text-sm" [attr.aria-invalid]="lastName.invalid && (lastName.touched || accountForm.submitted)" />
+        </div>
+      </div>
+      <div>
+        <label for="account-email" class="field-label">Email</label>
+        <input id="account-email" name="email" type="email" [(ngModel)]="draft.email" #email="ngModel" required email maxlength="255" class="glass-input w-full rounded-xl px-3 py-2.5 text-sm" [attr.aria-invalid]="email.invalid && (email.touched || accountForm.submitted)" />
+        @if (editing()?.passwordSet) {
+          <p class="mt-1.5 text-xs text-slate-500">They log in with this email, so tell them if you change it.</p>
+        }
+      </div>
+      @if (isStudents()) {
+        <div>
+          <label for="account-student-id" class="field-label">Student ID</label>
+          <input id="account-student-id" name="studentId" [(ngModel)]="draft.studentId" #studentId="ngModel" required maxlength="50" class="glass-input w-full rounded-xl px-3 py-2.5 font-mono text-sm" [attr.aria-invalid]="studentId.invalid && (studentId.touched || accountForm.submitted)" />
+        </div>
+      }
+      @if (accountForm.invalid && accountForm.submitted) {
+        <p class="text-sm text-rose-800">Please fill in every field, with a valid email.</p>
+      }
+      @if (formError()) {
+        <p role="alert" class="rounded-2xl bg-rose-50/90 px-4 py-3 text-sm text-rose-900">{{ formError() }}</p>
+      }
+      <div class="flex justify-end gap-2 pt-2">
+        <button type="button" class="btn btn-quiet" (click)="panelOpen.set(false)">Cancel</button>
+        <button type="submit" class="btn submit-button text-white" [disabled]="saving()">{{ saving() ? 'Saving…' : (editing() ? 'Save changes' : 'Add and send email') }}</button>
+      </div>
+    </form>
+  }
+</app-side-panel>

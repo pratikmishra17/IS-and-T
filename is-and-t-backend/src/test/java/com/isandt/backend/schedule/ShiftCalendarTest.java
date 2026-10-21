@@ -1,0 +1,77 @@
+package com.isandt.backend.schedule;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.util.List;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
+
+import com.isandt.backend.calendar.Semester;
+import com.isandt.backend.calendar.SemesterService;
+import com.isandt.backend.user.Student;
+
+class ShiftCalendarTest {
+
+	private final SemesterService semesters = mock(SemesterService.class);
+
+	private final ShiftPatternRepository patterns = mock(ShiftPatternRepository.class);
+
+	private final ShiftExceptionRepository exceptions = mock(ShiftExceptionRepository.class);
+
+	private final ShiftCalendar calendar = new ShiftCalendar(semesters, patterns, exceptions);
+
+	private final Student sam = withId(new Student("sam@example.com", "Sam", "Student", "2001", null), 7L);
+
+	/** Mondays in this test: 19 Oct 2026 (normal), 26 Oct 2026 (day off + extra shift). */
+	private final LocalDate monday = LocalDate.of(2026, 10, 19);
+
+	private final LocalDate nextMonday = LocalDate.of(2026, 10, 26);
+
+	@BeforeEach
+	void samWorksMondayMorningsInFall() {
+		Semester fall = mock(Semester.class);
+		when(fall.getId()).thenReturn(1L);
+		when(fall.contains(any())).thenReturn(true);
+		when(semesters.overlapping(any(), any())).thenReturn(List.of(fall));
+		when(patterns.findBySemesterIn(any())).thenReturn(List.of(
+				new ShiftPattern(sam, fall, new TimeBlock(DayOfWeek.MONDAY, LocalTime.of(9, 0), LocalTime.of(13, 0)))));
+		when(exceptions.findByDateBetween(any(), any())).thenReturn(List.of(
+				new ShiftException(sam, new ExceptionRequest(nextMonday, ShiftExceptionType.CANCEL, null, null, "Exam"), null),
+				new ShiftException(sam, new ExceptionRequest(nextMonday, ShiftExceptionType.EXTRA, LocalTime.of(15, 0), LocalTime.of(17, 0), null), null)));
+	}
+
+	@Test
+	void theWeeklyShiftAppliesOnItsWeekday() {
+		ShiftCalendar.Day day = calendar.on(7L, monday);
+
+		assertThat(day.shifts()).containsExactly(new ShiftCalendar.Shift(LocalTime.of(9, 0), LocalTime.of(13, 0), false));
+		assertThat(day.cancelled()).isFalse();
+	}
+
+	@Test
+	void aDayOffRemovesTheWeeklyShiftButKeepsAnExtraShift() {
+		ShiftCalendar.Day day = calendar.on(7L, nextMonday);
+
+		assertThat(day.cancelled()).isTrue();
+		assertThat(day.shifts()).containsExactly(new ShiftCalendar.Shift(LocalTime.of(15, 0), LocalTime.of(17, 0), true));
+	}
+
+	@Test
+	void otherWeekdaysHaveNoShifts() {
+		assertThat(calendar.on(7L, monday.plusDays(1)).shifts()).isEmpty();
+	}
+
+	private static Student withId(Student student, Long id) {
+		ReflectionTestUtils.setField(student, "id", id);
+		return student;
+	}
+
+}

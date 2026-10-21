@@ -1,0 +1,106 @@
+import { DatePipe } from '@angular/common';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
+import { Auth, User } from '../../../services/auth';
+import { AccountKind, Accounts } from '../../../services/accounts';
+import { CalendarApi, Holiday, Semester } from '../../../services/calendar';
+import { InventoryApi, Item } from '../../../services/inventory';
+import { AdminScheduleApi, Week } from '../../../services/schedule';
+import { AdminTaskApi, Task } from '../../../services/tasks';
+import { errorMessage } from '../../../services/errors';
+import { Toasts } from '../../../ui/toast';
+
+/**
+ * Admin portal home (/admin): today at a glance. For now that's accounts; the tasks, shifts and
+ * stock cards fill in as those features are built.
+ */
+@Component({
+  selector: 'app-admin-dashboard',
+  imports: [DatePipe, RouterLink],
+  templateUrl: './dashboard.html',
+})
+export class AdminDashboard implements OnInit {
+  private readonly api = inject(Accounts);
+  private readonly calendar = inject(CalendarApi);
+  private readonly inventory = inject(InventoryApi);
+  private readonly schedule = inject(AdminScheduleApi);
+  private readonly taskApi = inject(AdminTaskApi);
+  private readonly toasts = inject(Toasts);
+  protected readonly auth = inject(Auth);
+  protected readonly today = new Date();
+
+  protected readonly students = signal<User[]>([]);
+  protected readonly admins = signal<User[]>([]);
+  protected readonly semesters = signal<Semester[]>([]);
+  protected readonly holidays = signal<Holiday[]>([]);
+  protected readonly items = signal<Item[]>([]);
+  protected readonly week = signal<Week | null>(null);
+  protected readonly todaysTasks = signal<Task[]>([]);
+  /** Today's open tasks, unassigned first: those need attention. */
+  protected readonly openToday = computed(() => this.todaysTasks()
+    .filter((task) => task.status === 'UNASSIGNED' || task.status === 'ASSIGNED')
+    .sort((a, b) => (a.status === b.status ? a.startTime.localeCompare(b.startTime) : a.status === 'UNASSIGNED' ? -1 : 1)));
+  protected readonly unassignedToday = computed(() => this.todaysTasks().filter((task) => task.status === 'UNASSIGNED').length);
+  /** Students with at least one shift today, earliest start first. */
+  protected readonly onShiftToday = computed(() => {
+    const today = this.today.toLocaleDateString('en-CA');
+    return (this.week()?.students ?? [])
+      .map((student) => ({ name: student.name, shifts: student.days.find((day) => day.date === today)?.shifts ?? [] }))
+      .filter((student) => student.shifts.length > 0)
+      .sort((a, b) => a.shifts[0].start.localeCompare(b.shifts[0].start));
+  });
+  protected readonly isWeekend = [0, 6].includes(new Date().getDay());
+  /** Items at or below their threshold, emptiest first. */
+  protected readonly lowStock = computed(() => this.items()
+    .filter((item) => item.lowStock && !item.archived)
+    .sort((a, b) => a.onHand - b.onHand));
+  protected readonly loading = signal(true);
+  protected readonly sendingTo = signal<string | null>(null);
+
+  protected readonly currentSemester = computed(() => this.semesters().find((semester) => semester.current) ?? null);
+  /** The first holiday from today on ("2026-10-21" strings compare correctly as text). */
+  protected readonly nextHoliday = computed(() => {
+    const today = this.today.toLocaleDateString('en-CA');
+    return this.holidays().find((holiday) => holiday.date >= today) ?? null;
+  });
+
+  protected readonly activeStudents = computed(() => this.students().filter((s) => s.status === 'ACTIVE').length);
+  protected readonly disabledCount = computed(() => [...this.students(), ...this.admins()].filter((a) => a.status === 'DISABLED').length);
+  /** People who were added but haven't opened their email link yet. */
+  protected readonly waiting = computed(() =>
+    [...this.students(), ...this.admins()].filter((a) => a.status === 'ACTIVE' && !a.passwordSet));
+
+  async ngOnInit(): Promise<void> {
+    try {
+      const todayIso = this.today.toLocaleDateString('en-CA');
+      const [students, admins, semesters, holidays, items, week, tasks] = await Promise.all([
+        this.api.list('students'), this.api.list('admins'), this.calendar.semesters(), this.calendar.holidays(),
+        this.inventory.items(), this.schedule.week(), this.taskApi.list(todayIso, todayIso),
+      ]);
+      this.todaysTasks.set(tasks);
+      this.items.set(items);
+      this.week.set(week);
+      this.students.set(students);
+      this.admins.set(admins);
+      this.semesters.set(semesters);
+      this.holidays.set(holidays);
+    } catch (error) {
+      this.toasts.error(errorMessage(error));
+    } finally {
+      this.loading.set(false);
+    }
+  }
+
+  protected async resend(account: User): Promise<void> {
+    const kind: AccountKind = account.role === 'ADMIN' ? 'admins' : 'students';
+    this.sendingTo.set(`${kind}-${account.id}`);
+    try {
+      await this.api.sendPasswordLink(kind, account.id);
+      this.toasts.success(`A new set-password link was emailed to ${account.email}.`);
+    } catch (error) {
+      this.toasts.error(errorMessage(error));
+    } finally {
+      this.sendingTo.set(null);
+    }
+  }
+}

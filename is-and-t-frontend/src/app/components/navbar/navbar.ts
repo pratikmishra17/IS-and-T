@@ -1,24 +1,21 @@
-import { Component, ElementRef, HostListener, input, output, signal, viewChild } from '@angular/core';
-
-export type Page = 'home' | 'schedule' | 'inventory' | 'account' | 'login' | 'logout' | 'contact';
+import { Component, ElementRef, HostListener, computed, inject, signal, viewChild } from '@angular/core';
+import { RouterLink, RouterLinkActive } from '@angular/router';
+import { Auth } from '../../services/auth';
 
 @Component({
   selector: 'app-navbar',
+  imports: [RouterLink, RouterLinkActive],
   templateUrl: './navbar.html',
   host: { class: 'relative z-20 block w-full' },
 })
 export class Navbar {
-  readonly activePage = input<Page>('home');
-  readonly navigate = output<Page>();
+  protected readonly auth = inject(Auth);
   protected readonly profileOpen = signal(false);
-  protected readonly sections = ['home', 'schedule', 'inventory'] as const;
+  /** Students get their Tasks; the admin gets a link across to the admin portal instead. */
+  protected readonly sections = computed(() =>
+    this.auth.isAdmin() ? ['home', 'schedule', 'inventory', 'admin'] : ['home', 'tasks', 'schedule', 'inventory']);
   private readonly profile = viewChild<ElementRef<HTMLElement>>('profile');
   private readonly profileButton = viewChild<ElementRef<HTMLButtonElement>>('profileButton');
-
-  protected select(page: Page): void {
-    this.profileOpen.set(false);
-    this.navigate.emit(page);
-  }
 
   @HostListener('document:click', ['$event'])
   protected closeOutside(event: Event): void {

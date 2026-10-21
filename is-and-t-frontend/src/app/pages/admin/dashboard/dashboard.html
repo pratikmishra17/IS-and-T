@@ -1,0 +1,114 @@
+<div>
+  <p class="text-sm font-medium text-teal-800">{{ today | date: 'EEEE, MMMM d' }}</p>
+  <h1 class="mt-1 text-3xl font-semibold tracking-tight text-slate-900">Welcome back, {{ auth.currentUser()?.firstName }}.</h1>
+  @if (!loading()) {
+    <p class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-600">
+      @if (currentSemester(); as semester) {
+        <span><span class="font-medium text-slate-800">{{ semester.name }}</span> · {{ semester.weeklyHourLimit }} h/week limit · ends {{ semester.endDate | date: 'MMM d' }}</span>
+      } @else {
+        <a routerLink="/admin/calendar" class="font-medium text-amber-800 hover:underline">No semester covers today. Add one →</a>
+      }
+      @if (nextHoliday(); as holiday) {
+        <span aria-hidden="true" class="text-slate-300">|</span>
+        <span>Next holiday: <span class="font-medium text-slate-800">{{ holiday.name }}</span>, {{ holiday.date | date: 'EEE, MMM d' }}</span>
+      }
+    </p>
+  }
+</div>
+
+<section aria-label="Accounts at a glance" class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+  <a routerLink="/admin/users" class="glass-panel rounded-3xl p-5 hover:bg-white/70">
+    <p class="text-sm font-medium text-slate-600">Active students</p>
+    <p class="mt-2 text-3xl font-semibold text-slate-900">{{ loading() ? '–' : activeStudents() }}</p>
+  </a>
+  <a routerLink="/admin/users" class="glass-panel rounded-3xl p-5 hover:bg-white/70">
+    <p class="text-sm font-medium text-slate-600">Admins</p>
+    <p class="mt-2 text-3xl font-semibold text-slate-900">{{ loading() ? '–' : admins().length }}</p>
+  </a>
+  <div class="glass-panel rounded-3xl p-5">
+    <p class="text-sm font-medium text-slate-600">Waiting for password</p>
+    <p class="mt-2 text-3xl font-semibold" [class.text-amber-800]="waiting().length > 0" [class.text-slate-900]="waiting().length === 0">{{ loading() ? '–' : waiting().length }}</p>
+  </div>
+  <div class="glass-panel rounded-3xl p-5">
+    <p class="text-sm font-medium text-slate-600">Disabled accounts</p>
+    <p class="mt-2 text-3xl font-semibold text-slate-900">{{ loading() ? '–' : disabledCount() }}</p>
+  </div>
+</section>
+
+<div class="mt-6 grid gap-4 lg:grid-cols-3">
+  <section class="glass-panel rounded-3xl p-5 lg:col-span-2" aria-labelledby="attention-title">
+    <h2 id="attention-title" class="font-semibold text-slate-900">Needs attention</h2>
+    <p class="mt-1 text-sm text-slate-600">People who were added but haven’t set their password yet. Their link expires after 48 hours.</p>
+    @if (!loading() && waiting().length === 0) {
+      <p class="mt-6 rounded-2xl bg-teal-50/70 px-4 py-3 text-sm text-teal-900">Everyone has set their password.</p>
+    }
+    <ul class="mt-4 divide-y divide-slate-200/60">
+      @for (account of waiting(); track account.role + account.id) {
+        <li class="flex flex-wrap items-center justify-between gap-3 py-3">
+          <div class="min-w-0">
+            <p class="text-sm font-medium text-slate-900">{{ account.firstName }} {{ account.lastName }} <span class="badge ml-1 bg-slate-200/70 text-slate-600">{{ account.role === 'ADMIN' ? 'Admin' : 'Student' }}</span></p>
+            <p class="truncate text-sm text-slate-500">{{ account.email }} · added {{ account.createdAt | date: 'MMM d' }}</p>
+          </div>
+          <button type="button" class="btn btn-quiet py-2" [disabled]="sendingTo() === (account.role === 'ADMIN' ? 'admins' : 'students') + '-' + account.id" (click)="resend(account)">Resend link</button>
+        </li>
+      }
+    </ul>
+  </section>
+
+  <section class="flex flex-col gap-4" aria-label="More at a glance">
+    <a routerLink="/admin/inventory" class="glass-panel block rounded-3xl p-5 hover:bg-white/70" aria-labelledby="low-stock-title">
+      <div class="flex items-center justify-between">
+        <h2 id="low-stock-title" class="font-semibold text-slate-900">Low stock</h2>
+        @if (lowStock().length > 0) { <span class="badge bg-amber-100 text-amber-900">{{ lowStock().length }}</span> }
+      </div>
+      @if (!loading() && items().length === 0) {
+        <p class="mt-2 text-sm text-slate-500">No inventory yet.</p>
+      } @else if (!loading() && lowStock().length === 0) {
+        <p class="mt-2 text-sm text-teal-900">Everything is above its threshold.</p>
+      }
+      <ul class="mt-2 space-y-1.5">
+        @for (item of lowStock().slice(0, 5); track item.id) {
+          <li class="flex justify-between gap-3 text-sm">
+            <span class="truncate text-slate-700">{{ item.name }}</span>
+            <span class="shrink-0 font-semibold" [class.text-rose-800]="item.onHand === 0" [class.text-amber-800]="item.onHand > 0">{{ item.onHand }} left</span>
+          </li>
+        }
+      </ul>
+      @if (lowStock().length > 5) { <p class="mt-2 text-xs text-slate-500">and {{ lowStock().length - 5 }} more</p> }
+    </a>
+    <a routerLink="/admin/schedules" class="glass-panel block rounded-3xl p-5 hover:bg-white/70" aria-labelledby="on-shift-title">
+      <h2 id="on-shift-title" class="font-semibold text-slate-900">On shift today</h2>
+      @if (!loading() && isWeekend) {
+        <p class="mt-2 text-sm text-slate-500">No shifts on weekends.</p>
+      } @else if (!loading() && onShiftToday().length === 0) {
+        <p class="mt-2 text-sm text-slate-500">Nobody is scheduled today.</p>
+      }
+      <ul class="mt-2 space-y-1.5">
+        @for (student of onShiftToday(); track student.name) {
+          <li class="flex justify-between gap-3 text-sm">
+            <span class="truncate text-slate-700">{{ student.name }}</span>
+            <span class="shrink-0 text-slate-600">@for (shift of student.shifts; track shift.start) { {{ shift.start }}–{{ shift.end }}@if (!$last) {, } }</span>
+          </li>
+        }
+      </ul>
+    </a>
+    <a routerLink="/admin/tasks" class="glass-panel block rounded-3xl p-5 hover:bg-white/70" aria-labelledby="todays-tasks-title">
+      <div class="flex items-center justify-between">
+        <h2 id="todays-tasks-title" class="font-semibold text-slate-900">Today’s tasks</h2>
+        @if (unassignedToday() > 0) { <span class="badge bg-amber-100 text-amber-900">{{ unassignedToday() }} unassigned</span> }
+        @else if (todaysTasks().length > 0) { <span class="badge bg-white/70 text-slate-600">{{ todaysTasks().length }}</span> }
+      </div>
+      @if (!loading() && openToday().length === 0) {
+        <p class="mt-2 text-sm text-slate-500">{{ todaysTasks().length === 0 ? 'Nothing scheduled today.' : 'All of today’s tasks are done.' }}</p>
+      }
+      <ul class="mt-2 space-y-1.5">
+        @for (task of openToday().slice(0, 5); track task.id) {
+          <li class="flex justify-between gap-3 text-sm">
+            <span class="truncate text-slate-700">{{ task.startTime }} {{ task.title }}</span>
+            <span class="shrink-0 font-medium" [class.text-amber-800]="!task.assignee" [class.text-slate-600]="task.assignee">{{ task.assignee?.name ?? 'Unassigned' }}</span>
+          </li>
+        }
+      </ul>
+    </a>
+  </section>
+</div>
