@@ -45,6 +45,7 @@ class MyAccountServiceTest {
 		when(passwordEncoder.matches("old-password", "{bcrypt}old")).thenReturn(true);
 		when(passwordEncoder.encode("new-password")).thenReturn("{bcrypt}new");
 
+		when(passwordEncoder.matches("new-password", "{bcrypt}old")).thenReturn(false);
 		myAccount.changePassword(Role.ADMIN, 1L, new ChangePasswordRequest("old-password", "new-password"));
 
 		assertThat(ada.getPasswordHash()).isEqualTo("{bcrypt}new");

@@ -49,13 +49,23 @@ public class Accounts {
 		}
 	}
 
+	/** What the session check needs about an account, read fresh on every request. */
+	public record SessionState(boolean active, int sessionVersion, boolean mustChangePassword) {
+	}
+
+	@Transactional(readOnly = true)
+	public Optional<SessionState> sessionState(Role role, Long id) {
+		Optional<? extends Account> account = role == Role.ADMIN ? admins.findById(id) : students.findById(id);
+		return account.map(a -> new SessionState(a.isActive(), a.getSessionVersion(), a.isMustChangePassword()));
+	}
+
 	/** The logged-in person, from the role and id stored in their session. */
 	@Transactional(readOnly = true)
 	public AccountResponse describe(Role role, Long id) {
 		return AccountResponse.from(find(role, id));
 	}
 
-	Account find(Role role, Long id) {
+	public Account find(Role role, Long id) {
 		Optional<? extends Account> account = role == Role.ADMIN ? admins.findById(id) : students.findById(id);
 		return account.orElseThrow(() -> new NotFoundException("Account not found."));
 	}

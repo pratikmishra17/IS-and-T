@@ -31,9 +31,9 @@ describe('App routing', () => {
   });
 
   /** Logs in through the real Auth service, answering its HTTP call with a fake backend response. */
-  async function logInAs(user: User): Promise<void> {
-    const login = TestBed.inject(Auth).login(user.email, 'password');
-    http.expectOne('/api/auth/login').flush(user);
+  async function logInAs(user: User, mustChangePassword = false): Promise<void> {
+    const login = TestBed.inject(Auth).login(user.email, 'password', user.role);
+    http.expectOne('/api/auth/login').flush({ user, idleTimeoutSeconds: 1800, expiresAt: null, mustChangePassword });
     await login;
   }
 
@@ -298,6 +298,73 @@ describe('App routing', () => {
     await RouterTestingHarness.create('/admin');
 
     expect(TestBed.inject(Router).url).toBe('/home');
+  });
+
+  it('checks with the backend before opening a page, and sends an ended session to the login page', async () => {
+    await logInAs(student);
+    TestBed.inject(Auth).lastContact = 0; // the backend hasn't answered for a while
+    const harness = RouterTestingHarness.create('/tasks');
+    await new Promise((resolve) => setTimeout(resolve));
+    http.expectOne('/api/auth/me').flush(null, { status: 204, statusText: 'No Content' }); // e.g. the server restarted
+    await harness;
+
+    expect(TestBed.inject(Router).url).toBe('/login?ended=ended');
+    expect((await harness).routeNativeElement?.textContent).toContain('Your session has ended.');
+  });
+
+  it('only opens the account page until a temporary password is replaced', async () => {
+    await logInAs(admin, true);
+    const harness = await RouterTestingHarness.create('/admin/users');
+
+    expect(TestBed.inject(Router).url).toBe('/admin/account');
+    expect(harness.routeNativeElement?.textContent).toContain('Choose a new password to continue.');
+  });
+
+  it('explains on the login page why someone was signed out', async () => {
+    const harness = await RouterTestingHarness.create('/login?ended=idle');
+
+    expect(harness.routeNativeElement?.textContent).toContain('no activity for a while');
+  });
+
+  it('logs out from the account menu and goes straight to the login page', async () => {
+    await logInAs(student);
+    const harness = await RouterTestingHarness.create('/account');
+    const page: HTMLElement = harness.fixture.nativeElement;
+
+    page.querySelector<HTMLButtonElement>('button[aria-label^="Account menu"]')!.click();
+    harness.detectChanges();
+    const logout = [...page.querySelectorAll('button')].find((button) => button.textContent?.includes('Log out'))!;
+    logout.click();
+    http.expectOne('/api/auth/logout').flush(null);
+    await new Promise((resolve) => setTimeout(resolve));
+    http.expectOne('/api/auth/me').flush(null, { status: 204, statusText: 'No Content' });
+    await new Promise((resolve) => setTimeout(resolve));
+    await harness.fixture.whenStable();
+
+    expect(TestBed.inject(Auth).isLoggedIn()).toBe(false);
+    expect(TestBed.inject(Router).url).toBe('/login');
+  });
+
+  it('keeps admins out of the student portal', async () => {
+    await logInAs(admin);
+    await RouterTestingHarness.create('/home');
+    await new Promise((resolve) => setTimeout(resolve));
+    http.match(() => true).forEach((request) => request.flush([])); // the admin dashboard's data
+
+    expect(TestBed.inject(Router).url).toBe('/admin');
+  });
+
+  it('sends the portal with the login, and points to the other portal when refused', async () => {
+    const harness = await RouterTestingHarness.create('/login');
+    const page = harness.routeNativeElement!;
+    const auth = TestBed.inject(Auth);
+    const login = auth.login('ada@example.com', 'secret', 'STUDENT');
+    const request = http.expectOne('/api/auth/login');
+    expect(request.request.body.portal).toBe('STUDENT');
+    request.flush({ detail: 'This is the student portal. Admins log in at the admin portal.' }, { status: 403, statusText: 'Forbidden' });
+    await expect(login).rejects.toBeTruthy();
+    expect(auth.isLoggedIn()).toBe(false);
+    expect(page).toBeTruthy();
   });
 
   it('has no self-registration page', async () => {

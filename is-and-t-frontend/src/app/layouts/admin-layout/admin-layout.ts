@@ -1,9 +1,22 @@
 import { Component, inject, signal } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
-import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { Auth } from '../../services/auth';
+import { Theme } from '../../services/theme';
 import { ConfirmDialog } from '../../ui/confirm';
+import { AccountMenu } from '../../ui/account-menu';
+import { ThemeToggle } from '../../ui/theme-toggle';
 import { Toaster } from '../../ui/toast';
+
+const COLLAPSED_KEY = 'isandt.sidebarCollapsed';
+
+function readCollapsed(): boolean {
+  try {
+    return typeof localStorage !== 'undefined' && localStorage.getItem(COLLAPSED_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
 
 interface NavItem {
   label: string;
@@ -18,15 +31,31 @@ interface NavItem {
  */
 @Component({
   selector: 'app-admin-layout',
-  imports: [NgTemplateOutlet, RouterLink, RouterLinkActive, RouterOutlet, ConfirmDialog, Toaster],
+  imports: [NgTemplateOutlet, RouterLink, RouterLinkActive, RouterOutlet, ConfirmDialog, Toaster, ThemeToggle, AccountMenu],
   templateUrl: './admin-layout.html',
 })
 export class AdminLayout {
   protected readonly auth = inject(Auth);
-  private readonly router = inject(Router);
 
   /** Only used on small screens, where the sidebar is a slide-out menu. */
   protected readonly menuOpen = signal(false);
+
+  /** Large screens: the sidebar shrunk to icons. Remembered in this browser. */
+  protected readonly collapsed = signal(readCollapsed());
+
+  constructor() {
+    // Indigo accents and backdrop: the admin portal looks different from the user portal.
+    inject(Theme).setPortal('admin');
+  }
+
+  protected toggleCollapsed(): void {
+    this.collapsed.update((collapsed) => !collapsed);
+    try {
+      localStorage.setItem(COLLAPSED_KEY, String(this.collapsed()));
+    } catch {
+      // storage blocked: remembered until the page reloads
+    }
+  }
 
   protected readonly nav: NavItem[] = [
     { label: 'Dashboard', path: '/admin', icon: 'M3 3h7v9H3zM14 3h7v5h-7zM14 12h7v9h-7zM3 16h7v5H3z' },
@@ -37,9 +66,4 @@ export class AdminLayout {
     { label: 'Inventory', path: '/admin/inventory', icon: 'M21 8l-9-5-9 5 9 5 9-5zM3 8v8l9 5 9-5V8M12 13v8' },
     { label: 'Settings', path: '/admin/settings', icon: 'M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6' },
   ];
-
-  protected async logout(): Promise<void> {
-    await this.auth.logout();
-    await this.router.navigate(['/admin/login']);
-  }
 }

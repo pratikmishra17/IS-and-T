@@ -3,6 +3,17 @@
     <p class="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-teal-800">Admin portal</p>
   }
   <h1 id="login-title" class="text-4xl font-semibold tracking-tight text-slate-900">Welcome back.</h1>
+  @switch (ended()) {
+    @case ('idle') {
+      <p role="status" class="mt-5 rounded-2xl bg-amber-50/90 px-4 py-3 text-sm leading-6 text-amber-950">You were signed out because there was no activity for a while. Log in again to continue.</p>
+    }
+    @case ('max') {
+      <p role="status" class="mt-5 rounded-2xl bg-amber-50/90 px-4 py-3 text-sm leading-6 text-amber-950">For security, sessions end 12 hours after logging in. Log in again to continue.</p>
+    }
+    @case ('ended') {
+      <p role="status" class="mt-5 rounded-2xl bg-amber-50/90 px-4 py-3 text-sm leading-6 text-amber-950">Your session has ended. Log in again to continue.</p>
+    }
+  }
   @if (passwordSet()) {
     <p role="status" class="mt-5 rounded-2xl bg-teal-50/80 px-4 py-3 text-sm leading-6 text-teal-900">Password saved. Log in below, and bookmark this page for next time.</p>
   }
@@ -29,7 +40,12 @@
       }
     </div>
     @if (error()) {
-      <p role="alert" class="rounded-2xl bg-rose-50/80 px-4 py-3 text-sm text-rose-900">{{ error() }}</p>
+      <p role="alert" class="rounded-2xl bg-rose-50/80 px-4 py-3 text-sm text-rose-900">
+        {{ error() }}
+        @if (wrongPortal()) {
+          <a [routerLink]="portal() === 'admin' ? '/login' : '/admin/login'" class="font-semibold underline">Go to the {{ portal() === 'admin' ? 'student' : 'admin' }} portal</a>
+        }
+      </p>
     }
     <button type="submit" class="submit-button glass-button" [disabled]="submitting()">{{ submitting() ? 'Logging in…' : 'Log in' }} <span aria-hidden="true">→</span></button>  </form>
 </section>

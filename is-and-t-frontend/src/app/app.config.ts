@@ -6,6 +6,8 @@ import { routes } from './app.routes';
 import { provideClientHydration } from '@angular/platform-browser';
 import { Auth } from './services/auth';
 import { authInterceptor } from './services/auth.interceptor';
+import { startSessionTimer } from './ui/session-timer';
+import { startTheme } from './services/theme';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -22,5 +24,9 @@ export const appConfig: ApplicationConfig = {
       }
       return undefined;
     }),
+    // Signs people out after inactivity or the maximum session length, with a warning first.
+    provideAppInitializer(startSessionTimer),
+    // Dark mode (following the device until the switch is used) and the glass hover effect.
+    provideAppInitializer(startTheme),
   ]
 };

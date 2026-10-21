@@ -32,10 +32,10 @@ export class SetPassword {
     this.submitting.set(true);
     this.error.set(null);
     try {
-      await this.auth.setPassword(this.token() ?? '', form.value.password);
-      // On to the login page (the one to bookmark), which shows a "password saved" message.
-      // replaceUrl keeps the used link out of the browser's Back history.
-      await this.router.navigate(['/login'], { queryParams: { passwordSet: true }, replaceUrl: true });
+      const role = await this.auth.setPassword(this.token() ?? '', form.value.password);
+      // On to the login page of their portal (the one to bookmark), which shows a "password saved"
+      // message. replaceUrl keeps the used link out of the browser's Back history.
+      await this.router.navigate([role === 'ADMIN' ? '/admin/login' : '/login'], { queryParams: { passwordSet: true }, replaceUrl: true });
     } catch (error) {
       this.error.set(errorMessage(error));
     } finally {

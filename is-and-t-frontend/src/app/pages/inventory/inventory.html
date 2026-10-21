@@ -2,9 +2,7 @@
   <p class="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-teal-800">Find it in the back rooms</p>
   <h1 id="inventory-title" class="text-4xl font-semibold tracking-tight text-slate-900">Inventory.</h1>
 
-  @if (auth.isAdmin()) {
-    <p class="mt-4 text-sm text-slate-600">Stock is managed in the <a routerLink="/admin/inventory" class="font-medium text-teal-900 underline">admin portal</a>.</p>
-  } @else if (error()) {
+  @if (error()) {
     <p role="alert" class="mt-6 rounded-2xl bg-rose-50/80 px-4 py-3 text-sm text-rose-900">{{ error() }}</p>
   } @else if (!items()) {
     <p class="mt-6 text-sm text-slate-600">Loading…</p>

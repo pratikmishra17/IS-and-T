@@ -10,10 +10,17 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.isandt.backend.auth.PasswordTokenService;
+import com.isandt.backend.auth.TokenPurpose;
+
 /**
- * Development only (@Profile("dev")). On every startup, makes sure the app.seed.* admin from
- * application-dev.properties exists, is active and has exactly that password, so the dev login at
- * /admin/login always works. Other admins (added in the admin portal) are left alone.
+ * Development only (@Profile("dev")): makes sure a fresh database has an admin to log in with.
+ * It only ever creates that account; an existing one is left exactly as it is (its password is
+ * never reset). No password is stored in the code or in git:
+ * <ul>
+ * <li>with DEV_ADMIN_PASSWORD set, the account starts with that password and must change it at first login;</li>
+ * <li>without it, a set-password link is emailed to the admin's address.</li>
+ * </ul>
  */
 @Component
 @Profile("dev")
@@ -27,6 +34,10 @@ public class DevDataSeeder implements ApplicationRunner {
 
 	private final PasswordEncoder passwordEncoder;
 
+	private final PasswordTokenService passwordTokens;
+
+	private final AccountEmails emails;
+
 	private final String email;
 
 	private final String password;
@@ -36,12 +47,14 @@ public class DevDataSeeder implements ApplicationRunner {
 	private final String lastName;
 
 	DevDataSeeder(AdminRepository admins, StudentRepository students, PasswordEncoder passwordEncoder,
-			@Value("${app.seed.admin-email}") String email, @Value("${app.seed.admin-password}") String password,
-			@Value("${app.seed.admin-first-name}") String firstName,
+			PasswordTokenService passwordTokens, AccountEmails emails, @Value("${app.seed.admin-email}") String email,
+			@Value("${app.seed.admin-password:}") String password, @Value("${app.seed.admin-first-name}") String firstName,
 			@Value("${app.seed.admin-last-name}") String lastName) {
 		this.admins = admins;
 		this.students = students;
 		this.passwordEncoder = passwordEncoder;
+		this.passwordTokens = passwordTokens;
+		this.emails = emails;
 		this.email = Account.normalizeEmail(email);
 		this.password = password;
 		this.firstName = firstName;
@@ -51,21 +64,26 @@ public class DevDataSeeder implements ApplicationRunner {
 	@Override
 	@Transactional
 	public void run(ApplicationArguments args) {
-		// One email can't be both a student and an admin; free it up for the seed admin if needed.
-		students.findByEmail(email).ifPresent(student -> {
-			students.delete(student);
-			log.warn("Removed student account {} so it can be the dev admin.", email);
-		});
+		if (admins.findByEmail(email).isPresent()) {
+			return;
+		}
+		if (students.findByEmail(email).isPresent()) {
+			log.warn("Not creating the dev admin: {} is already a student account.", email);
+			return;
+		}
 
-		Admin admin = admins.findByEmail(email).orElseGet(() -> {
-			log.info("Creating the dev admin {}.", email);
-			Admin created = new Admin(email, firstName, lastName, null);
-			created.setReceivesDigest(true); // only when created: afterwards it's chosen on the Settings page
-			return admins.save(created);
-		});
-		admin.enable();
-		admin.changePasswordHash(passwordEncoder.encode(password));
-		log.info("Dev admin ready: log in at /admin/login as {} with app.seed.admin-password.", email);
+		Admin admin = new Admin(email, firstName, lastName, null);
+		admin.setReceivesDigest(true);
+		admins.save(admin);
+		if (password.isBlank()) {
+			emails.added(admin, passwordTokens.issue(admin, TokenPurpose.SET_PASSWORD));
+			log.info("Created the dev admin {}; a set-password link was emailed to it.", email);
+		}
+		else {
+			admin.changePasswordHash(passwordEncoder.encode(password));
+			admin.requirePasswordChange();
+			log.info("Created the dev admin {} with DEV_ADMIN_PASSWORD; it must be changed at first login.", email);
+		}
 	}
 
 }

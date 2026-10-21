@@ -33,6 +33,11 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
 	}
 
+	@ExceptionHandler(TooManyAttemptsException.class)
+	ProblemDetail handleTooManyAttempts(TooManyAttemptsException ex) {
+		return ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage());
+	}
+
 	@ExceptionHandler(ConflictException.class)
 	ProblemDetail handleConflict(ConflictException ex) {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
@@ -64,6 +69,11 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 	 * Failed login. The message is the same whatever went wrong (unknown email, wrong password,
 	 * disabled account), so it can't be used to find out which emails have accounts.
 	 */
+	@ExceptionHandler(ForbiddenException.class)
+	ProblemDetail handleForbidden(ForbiddenException ex) {
+		return ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+	}
+
 	@ExceptionHandler(AuthenticationException.class)
 	ProblemDetail handleAuthentication(AuthenticationException ex) {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, "Invalid email or password.");

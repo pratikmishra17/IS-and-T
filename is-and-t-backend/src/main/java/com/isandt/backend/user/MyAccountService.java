@@ -28,15 +28,20 @@ public class MyAccountService {
 
 	/**
 	 * Requires the current password, so someone who finds a logged-in laptop can't lock the owner
-	 * out. passwordEncoder.matches() hashes the typed password the same way and compares.
+	 * out. passwordEncoder.matches() hashes the typed password the same way and compares. Every other
+	 * session of the account is signed out; returns the new session version for the current one.
 	 */
 	@Transactional
-	public void changePassword(Role role, Long id, ChangePasswordRequest request) {
+	public int changePassword(Role role, Long id, ChangePasswordRequest request) {
 		Account account = accounts.find(role, id);
 		if (!passwordEncoder.matches(request.currentPassword(), account.getPasswordHash())) {
 			throw new ConflictException("Your current password is incorrect.");
 		}
+		if (passwordEncoder.matches(request.newPassword(), account.getPasswordHash())) {
+			throw new ConflictException("Choose a password different from your current one.");
+		}
 		account.changePasswordHash(passwordEncoder.encode(request.newPassword()));
+		return account.getSessionVersion();
 	}
 
 }

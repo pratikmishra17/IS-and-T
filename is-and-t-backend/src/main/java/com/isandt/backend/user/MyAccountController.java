@@ -10,6 +10,9 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.isandt.backend.auth.AuthenticatedUser;
+import com.isandt.backend.auth.SessionGuardFilter;
+
+import jakarta.servlet.http.HttpSession;
 
 import jakarta.validation.Valid;
 
@@ -29,11 +32,13 @@ public class MyAccountController {
 		return myAccount.rename(me.getRole(), me.getId(), request);
 	}
 
+	/** Your other sessions are signed out; this one is kept by moving it to the new session version. */
 	@PostMapping("/password")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	void changePassword(@Valid @RequestBody ChangePasswordRequest request,
-			@AuthenticationPrincipal AuthenticatedUser me) {
-		myAccount.changePassword(me.getRole(), me.getId(), request);
+			@AuthenticationPrincipal AuthenticatedUser me, HttpSession session) {
+		int version = myAccount.changePassword(me.getRole(), me.getId(), request);
+		session.setAttribute(SessionGuardFilter.VERSION, version);
 	}
 
 }

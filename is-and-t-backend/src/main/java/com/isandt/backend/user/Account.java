@@ -53,6 +53,15 @@ public abstract class Account {
 	@Column(nullable = false)
 	private Instant createdAt;
 
+	/**
+	 * Every login session remembers this number. Bumping it (disable, new password) makes all of the
+	 * account's existing sessions invalid on their next request (see SessionGuardFilter).
+	 */
+	private int sessionVersion;
+
+	/** True until the person picks a new password; meanwhile they can do nothing else. */
+	private boolean mustChangePassword;
+
 	/** Required by JPA, which creates the object first and then fills in the fields. */
 	protected Account() {
 	}
@@ -85,14 +94,30 @@ public abstract class Account {
 
 	public void disable() {
 		this.status = AccountStatus.DISABLED;
+		endSessions();
+	}
+
+	/** Signs the account out everywhere, on each session's next request. */
+	public void endSessions() {
+		this.sessionVersion++;
+	}
+
+	public void requirePasswordChange() {
+		this.mustChangePassword = true;
 	}
 
 	public void enable() {
 		this.status = AccountStatus.ACTIVE;
 	}
 
+	/**
+	 * A new password signs the account out of every other session (someone who knew the old one is
+	 * locked out) and clears any forced change.
+	 */
 	public void changePasswordHash(String passwordHash) {
 		this.passwordHash = passwordHash;
+		this.mustChangePassword = false;
+		endSessions();
 	}
 
 	public boolean isActive() {
@@ -125,6 +150,14 @@ public abstract class Account {
 
 	public Instant getCreatedAt() {
 		return createdAt;
+	}
+
+	public int getSessionVersion() {
+		return sessionVersion;
+	}
+
+	public boolean isMustChangePassword() {
+		return mustChangePassword;
 	}
 
 }

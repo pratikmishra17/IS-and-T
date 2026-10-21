@@ -2,9 +2,7 @@
   <p class="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-teal-800">Plan your hours</p>
   <h1 id="schedule-title" class="text-4xl font-semibold tracking-tight text-slate-900">My schedule.</h1>
 
-  @if (auth.isAdmin()) {
-    <p class="mt-4 text-sm leading-6 text-slate-600">Admins plan everyone’s shifts in the <a routerLink="/admin/schedules" class="font-medium text-teal-900 underline">admin portal</a>.</p>
-  } @else if (loading()) {
+  @if (loading()) {
     <p class="mt-6 text-sm text-slate-600">Loading…</p>
   } @else {
     <div role="tablist" aria-label="Schedule" class="mt-6 inline-flex gap-1 rounded-2xl border border-white/60 bg-white/30 p-1">
@@ -14,7 +12,7 @@
     </div>
   }
 
-  @if (auth.isAdmin() || loading()) {
+  @if (loading()) {
   } @else if (tab() === 'week') {
     @if (week(); as w) {
       <div class="mt-5 flex flex-wrap items-center justify-between gap-3">
@@ -34,7 +32,7 @@
             <div class="flex flex-wrap items-center gap-2">
               <span class="font-semibold text-slate-900">{{ day.date | date: 'EEEE' }}</span>
               <span class="text-sm text-slate-500">{{ day.date | date: 'MMM d' }}</span>
-              @if (day.date === today) { <span class="badge bg-teal-800 text-white">Today</span> }
+              @if (day.date === today) { <span class="badge badge-solid">Today</span> }
               @if (day.holiday) { <span class="badge bg-rose-100 text-rose-900">{{ day.holiday }}</span> }
               @if (day.dayOff) { <span class="badge bg-slate-200 text-slate-700">Day off</span> }
               @for (off of day.timeOff; track off.start) { <span class="badge bg-slate-200 text-slate-700">Off {{ off.start }}–{{ off.end }}</span> }

@@ -1,6 +1,5 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
 import { Auth } from '../../services/auth';
 import { errorMessage } from '../../services/errors';
 import { PortalApi, StockLookup } from '../../services/portal';
@@ -8,7 +7,7 @@ import { PortalApi, StockLookup } from '../../services/portal';
 /** User portal: Inventory (/inventory). Read-only: find an item and see which room has it. */
 @Component({
   selector: 'app-inventory',
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule],
   templateUrl: './inventory.html',
 })
 export class Inventory implements OnInit {
@@ -30,9 +29,6 @@ export class Inventory implements OnInit {
   });
 
   async ngOnInit(): Promise<void> {
-    if (this.auth.isAdmin()) {
-      return; // admins manage stock in the admin portal
-    }
     try {
       this.items.set(await this.api.stock());
     } catch (error) {

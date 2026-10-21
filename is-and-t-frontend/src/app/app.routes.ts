@@ -21,7 +21,7 @@ export const routes: Routes = [
       // Every other admin page needs an admin; the guard on this group covers them all
       {
         path: '',
-        canActivate: [adminGuard],
+        canActivateChild: [adminGuard],
         children: [
           { path: '', pathMatch: 'full', title: 'Dashboard · IS&T Admin', loadComponent: () => import('./pages/admin/dashboard/dashboard').then((m) => m.AdminDashboard) },
           { path: 'users', title: 'Users · IS&T Admin', loadComponent: () => import('./pages/admin/users/users').then((m) => m.AdminUsers) },
@@ -56,7 +56,7 @@ export const routes: Routes = [
       // (lazy), so the login page doesn't download them.
       {
         path: '',
-        canActivate: [authGuard],
+        canActivateChild: [authGuard],
         children: [
           { path: 'home', title: 'Home · IS&T', loadComponent: () => import('./pages/home/home').then((m) => m.Home) },
           { path: 'tasks', title: 'Tasks · IS&T', loadComponent: () => import('./pages/tasks/tasks').then((m) => m.Tasks) },

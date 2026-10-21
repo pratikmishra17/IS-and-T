@@ -69,9 +69,6 @@ export class Home implements OnInit, OnDestroy {
   });
 
   async ngOnInit(): Promise<void> {
-    if (this.auth.isAdmin()) {
-      return;
-    }
     this.timer = setInterval(() => this.now.set(new Date()), 30_000);
     try {
       this.day.set(await this.api.today());

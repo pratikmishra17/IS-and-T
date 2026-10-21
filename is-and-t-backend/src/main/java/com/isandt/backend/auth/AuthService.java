@@ -8,6 +8,7 @@ import com.isandt.backend.common.error.ConflictException;
 import com.isandt.backend.user.Account;
 import com.isandt.backend.user.AccountEmails;
 import com.isandt.backend.user.Accounts;
+import com.isandt.backend.user.Role;
 
 /**
  * What anyone can do without being logged in: set a password from an email link, and ask for
@@ -33,12 +34,13 @@ public class AuthService {
 	}
 
 	@Transactional
-	public void setPassword(SetPasswordRequest request) {
+	public Role setPassword(SetPasswordRequest request) {
 		Account account = passwordTokens.redeem(request.token());
 		if (!account.isActive()) {
 			throw new ConflictException("This account is not active.");
 		}
 		account.changePasswordHash(passwordEncoder.encode(request.password()));
+		return account.getRole();
 	}
 
 	/**

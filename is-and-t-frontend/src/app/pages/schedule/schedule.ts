@@ -1,7 +1,6 @@
 import { DatePipe } from '@angular/common';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
 import { Auth } from '../../services/auth';
 import { Semester } from '../../services/calendar';
 import { errorMessage } from '../../services/errors';
@@ -18,7 +17,7 @@ import { TimeBlocksEditor } from '../../ui/time-blocks-editor';
  */
 @Component({
   selector: 'app-schedule',
-  imports: [DatePipe, FormsModule, RouterLink, TimeBlocksEditor],
+  imports: [DatePipe, FormsModule, TimeBlocksEditor],
   templateUrl: './schedule.html',
 })
 export class Schedule implements OnInit {
@@ -63,10 +62,6 @@ export class Schedule implements OnInit {
   protected readonly preferredHours = computed(() => Math.round(totalHours(this.preferred()) * 10) / 10);
 
   async ngOnInit(): Promise<void> {
-    if (this.auth.isAdmin()) {
-      this.loading.set(false);
-      return; // admins plan everyone's shifts in the admin portal instead
-    }
     try {
       this.week.set(await this.portal.week());
       this.myTimeOff.set(await this.timeOffApi.list());

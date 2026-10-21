@@ -1,5 +1,6 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule, NgForm } from '@angular/forms';
+import { Router } from '@angular/router';
 import { Auth } from '../../services/auth';
 import { errorMessage } from '../../services/errors';
 import { Toasts } from '../../ui/toast';
@@ -13,6 +14,7 @@ import { Toasts } from '../../ui/toast';
 export class Account {
   protected readonly auth = inject(Auth);
   private readonly toasts = inject(Toasts);
+  private readonly router = inject(Router);
 
   protected name = {
     firstName: this.auth.currentUser()?.firstName ?? '',
@@ -50,9 +52,14 @@ export class Account {
     }
     this.savingPassword.set(true);
     try {
+      const wasTemporary = this.auth.mustChangePassword();
       await this.auth.changePassword(form.value.currentPassword, form.value.newPassword);
       form.resetForm();
-      this.toasts.success('Your password was changed.');
+      this.toasts.success('Your password was changed. You’ve been signed out everywhere else.');
+      if (wasTemporary) {
+        // Now the rest of the app opens up.
+        await this.router.navigate([this.auth.isAdmin() ? '/admin' : '/home']);
+      }
     } catch (error) {
       this.passwordError.set(errorMessage(error));
     } finally {

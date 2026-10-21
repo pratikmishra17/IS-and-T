@@ -304,6 +304,23 @@ Phone-first: students use it between buildings.
 | F3 | Contact page removed | ✅ |
 | F4 | Calendar subscription: private .ics link per student (shifts and tasks, 2 weeks back to 8 ahead), regenerate to revoke | ✅ |
 
+## 7d. Security hardening (Oct 2026)
+
+| # | Change | Where | Status |
+|---|---|---|---|
+| 1 | A backend restart signs everyone out (DevTools no longer saves sessions to disk) | `application-dev.properties` | ✅ |
+| 2 | Logged-in pages re-check the session with the backend on every page change; an ended session goes to login with a reason | `auth.guards.ts` (`canActivateChild`), `Auth.verify` | ✅ |
+| 3 | Idle timeout: 15 min admins, 30 min students; "Still there?" warning a minute before; activity on a quiet page keeps the session alive; tabs share activity and logouts | `SessionPolicy`, `ui/session-timer.ts` | ✅ |
+| 4 | Sessions end 12 hours after login regardless of activity | `SessionGuardFilter` | ✅ |
+| 5 | Disabling or removing an account, or changing its password, ends its other sessions at once (session version per account) | `Account.endSessions`, V12 | ✅ |
+| 6 | Login limits: 5 wrong passwords per account / 20 per address in 15 min; forgot-password 3 per account per hour and 5 per address; set-password 10 per address (429 with a wait time) | `LoginThrottle` | ✅ |
+| 8 | No password in git: the dev admin is created once from `DEV_ADMIN_PASSWORD` (must be changed at first login) or gets an emailed link; temporary passwords block everything except choosing a new one | `DevDataSeeder`, `SessionGuardFilter`, account page | ✅ |
+| 12 | Automated security tests: every endpoint checked for 401 (anonymous), 403 (wrong role), 403 (no CSRF token), plus session ending, temporary passwords, login limits and headers | `SecurityRulesTest`, `LoginThrottleTest`, `app.spec.ts` | ✅ |
+| 16–17 | Content-Security-Policy, no framing, no MIME sniffing, no referrer, no camera/mic/location (API, dev server and production server) | `SecurityConfig`, `angular.json`, `server.ts` | ✅ |
+| 18 | Cookies HttpOnly (session) and SameSite=Lax; Secure and HSTS when served over HTTPS | properties, `SecurityConfig`, `server.ts` | ✅ |
+| 19 | Limited database users: `isandt_owner` for migrations, `isandt_app` (rows only) for the app | `docs/db-roles.sql` | ✅ script ready; run it to switch |
+| 24 | Production profile (`SPRING_PROFILES_ACTIVE=prod`) that refuses to start with unsafe settings (http URL, insecure cookies, no email, the postgres superuser) | `application-prod.properties`, `ProductionSafetyCheck` | ✅ |
+
 ## 8. Open questions
 
 1. **Which managers receive the daily digest?** To be decided; it's a setting, so it can be changed at any time.
