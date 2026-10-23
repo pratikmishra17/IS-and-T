@@ -24,6 +24,7 @@ export const routes: Routes = [
         canActivateChild: [adminGuard],
         children: [
           { path: '', pathMatch: 'full', title: 'Dashboard · IS&T Admin', loadComponent: () => import('./pages/admin/dashboard/dashboard').then((m) => m.AdminDashboard) },
+          { path: 'planner', title: 'Planner · IS&T Admin', loadComponent: () => import('./pages/admin/planner/planner').then((m) => m.AdminPlanner) },
           { path: 'users', title: 'Users · IS&T Admin', loadComponent: () => import('./pages/admin/users/users').then((m) => m.AdminUsers) },
           { path: 'calendar', title: 'Calendar · IS&T Admin', loadComponent: () => import('./pages/admin/calendar/calendar').then((m) => m.AdminCalendar) },
           { path: 'schedules', title: 'Schedules · IS&T Admin', loadComponent: () => import('./pages/admin/schedules/schedules').then((m) => m.AdminSchedules) },

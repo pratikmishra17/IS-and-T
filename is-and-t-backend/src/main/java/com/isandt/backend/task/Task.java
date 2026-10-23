@@ -5,12 +5,18 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.hibernate.annotations.BatchSize;
 
 import com.isandt.backend.common.error.ConflictException;
 import com.isandt.backend.user.Admin;
 import com.isandt.backend.user.Student;
 
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -20,6 +26,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OrderColumn;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 
@@ -48,20 +55,26 @@ public class Task {
 	@Column(nullable = false)
 	private int durationMinutes;
 
+	/** Where it happens, typed freely ("BU 201", "Rhodes Tower 1408"). */
 	@Column(nullable = false)
-	private String building;
+	private String location;
 
-	@Column(nullable = false)
-	private String room;
-
-	@Column(nullable = false)
 	private String employeeName;
 
 	private String employeeEmail;
 
 	private String employeePhone;
 
-	private String employeeDepartment;
+	/**
+	 * What to bring, in the order the admin typed it. @ElementCollection stores the list in its own
+	 * table (task_supplies) owned by this task; @OrderColumn keeps the order. @BatchSize loads the
+	 * lists of many tasks in a few queries instead of one per task.
+	 */
+	@ElementCollection
+	@CollectionTable(name = "task_supplies", joinColumns = @JoinColumn(name = "task_id"))
+	@OrderColumn(name = "position")
+	@BatchSize(size = 50)
+	private List<Supply> supplies = new ArrayList<>();
 
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false)
@@ -112,12 +125,12 @@ public class Task {
 		this.description = blankToNull(request.description());
 		this.startAt = request.date().atTime(request.startTime()).atZone(zone).toInstant();
 		this.durationMinutes = request.durationMinutes();
-		this.building = request.building().trim();
-		this.room = request.room().trim();
-		this.employeeName = request.employeeName().trim();
+		this.location = request.location().trim();
+		this.employeeName = blankToNull(request.employeeName());
 		this.employeeEmail = blankToNull(request.employeeEmail());
 		this.employeePhone = blankToNull(request.employeePhone());
-		this.employeeDepartment = blankToNull(request.employeeDepartment());
+		this.supplies.clear();
+		request.supplies().forEach(line -> this.supplies.add(new Supply(line.name().trim(), line.quantity())));
 	}
 
 	void assignTo(Student student, boolean offShift) {
@@ -217,12 +230,8 @@ public class Task {
 		return durationMinutes;
 	}
 
-	public String getBuilding() {
-		return building;
-	}
-
-	public String getRoom() {
-		return room;
+	public String getLocation() {
+		return location;
 	}
 
 	public String getEmployeeName() {
@@ -237,8 +246,8 @@ public class Task {
 		return employeePhone;
 	}
 
-	public String getEmployeeDepartment() {
-		return employeeDepartment;
+	public List<Supply> getSupplies() {
+		return supplies;
 	}
 
 	public TaskStatus getStatus() {

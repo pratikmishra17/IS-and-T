@@ -17,22 +17,28 @@ public final class TaskResponses {
 	public record Person(Long id, String name) {
 	}
 
-	public record Employee(String name, String email, String phone, String department) {
+	/** Who the task is for. Every field may be empty. */
+	public record Employee(String name, String email, String phone) {
+	}
+
+	/** Something to bring. */
+	public record SupplyResponse(String name, int quantity) {
 	}
 
 	/** A task. date/startTime/endTime are campus time, ready to display. */
 	public record TaskResponse(Long id, TaskType type, String title, String description, LocalDate date,
 			@JsonFormat(pattern = "HH:mm") java.time.LocalTime startTime,
-			@JsonFormat(pattern = "HH:mm") java.time.LocalTime endTime, int durationMinutes, String building, String room,
-			Employee employee, TaskStatus status, Person assignee, boolean claimedOffShift, String outcomeNotes,
-			Instant finishedAt, Long parentTaskId, List<PlannedItemResponse> items) {
+			@JsonFormat(pattern = "HH:mm") java.time.LocalTime endTime, int durationMinutes, String location,
+			Employee employee, List<SupplyResponse> supplies, TaskStatus status, Person assignee, boolean claimedOffShift,
+			String outcomeNotes, Instant finishedAt, Long parentTaskId, List<PlannedItemResponse> items) {
 
 		static TaskResponse from(Task task, ZoneId zone, List<PlannedItemResponse> items) {
 			Person assignee = task.getAssignee() == null ? null
 					: new Person(task.getAssignee().getId(), task.getAssignee().getFirstName() + " " + task.getAssignee().getLastName());
 			return new TaskResponse(task.getId(), task.getType(), task.getTitle(), task.getDescription(), task.date(zone),
-					task.startTime(zone), task.endTime(zone), task.getDurationMinutes(), task.getBuilding(), task.getRoom(),
-					new Employee(task.getEmployeeName(), task.getEmployeeEmail(), task.getEmployeePhone(), task.getEmployeeDepartment()),
+					task.startTime(zone), task.endTime(zone), task.getDurationMinutes(), task.getLocation(),
+					new Employee(task.getEmployeeName(), task.getEmployeeEmail(), task.getEmployeePhone()),
+					task.getSupplies().stream().map(s -> new SupplyResponse(s.getName(), s.getQuantity())).toList(),
 					task.getStatus(), assignee, task.isClaimedOffShift(), task.getOutcomeNotes(), task.getFinishedAt(),
 					task.getParentTaskId(), items);
 		}

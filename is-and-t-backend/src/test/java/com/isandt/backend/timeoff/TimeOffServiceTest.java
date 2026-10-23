@@ -96,8 +96,8 @@ class TimeOffServiceTest {
 
 	private static TaskResponse task(Long id, String title, String start, TaskStatus status, Person assignee) {
 		LocalTime from = LocalTime.parse(start);
-		return new TaskResponse(id, TaskType.FIX, title, null, MONDAY, from, from.plusMinutes(30), 30, "RT", "1408",
-				new Employee("Pat", null, null, null), status, assignee, false, null, null, null, List.of());
+		return new TaskResponse(id, TaskType.FIX, title, null, MONDAY, from, from.plusMinutes(30), 30, "RT 1408",
+				new Employee("Pat", null, null), List.of(), status, assignee, false, null, null, null, List.of());
 	}
 
 	private static Student student() {

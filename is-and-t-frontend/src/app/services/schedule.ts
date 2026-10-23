@@ -88,9 +88,49 @@ export function totalHours(blocks: TimeBlock[]): number {
   return blocks.reduce((sum, block) => sum + Math.max(0, minutes(block.end) - minutes(block.start)), 0) / 60;
 }
 
-function minutes(time: string): number {
+/** "09:30" → 570 (minutes after midnight) */
+export function minutes(time: string): number {
   const [hours, mins] = time.split(':').map(Number);
   return hours * 60 + mins;
+}
+
+/** 570 → "09:30" */
+export function clock(totalMinutes: number): string {
+  return `${String(Math.floor(totalMinutes / 60)).padStart(2, '0')}:${String(totalMinutes % 60).padStart(2, '0')}`;
+}
+
+/**
+ * Tidies a list of weekly shifts: drops empty ones, joins any that overlap or touch on the same
+ * day (Mon 9–12 and Mon 11–13 become Mon 9–13), and sorts them by day, then time. Every edit in
+ * the shift editor goes through this, so the list never holds two shifts covering the same time.
+ */
+export function mergeShifts(blocks: TimeBlock[]): TimeBlock[] {
+  const order = (day: Day) => ALL_DAYS.indexOf(day);
+  const sorted = blocks
+    .filter((block) => minutes(block.end) > minutes(block.start))
+    .sort((a, b) => order(a.day) - order(b.day) || minutes(a.start) - minutes(b.start));
+  const merged: TimeBlock[] = [];
+  for (const block of sorted) {
+    const last = merged.at(-1);
+    if (last && last.day === block.day && minutes(block.start) <= minutes(last.end)) {
+      if (minutes(block.end) > minutes(last.end)) {
+        merged[merged.length - 1] = { ...last, end: block.end };
+      }
+    } else {
+      merged.push({ ...block });
+    }
+  }
+  return merged;
+}
+
+/** Adds the same hours on each of the given days ("Mon, Wed, Fri 9:00–12:00"). */
+export function addOnDays(blocks: TimeBlock[], days: Day[], start: string, end: string): TimeBlock[] {
+  return mergeShifts([...blocks, ...days.map((day) => ({ day, start, end }))]);
+}
+
+/** True if two blocks on the same day share any time. */
+export function overlaps(a: TimeBlock, b: TimeBlock): boolean {
+  return a.day === b.day && minutes(a.start) < minutes(b.end) && minutes(b.start) < minutes(a.end);
 }
 
 /** User portal: the logged-in student's schedule. */

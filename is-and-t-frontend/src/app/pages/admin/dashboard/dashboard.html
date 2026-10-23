@@ -81,7 +81,7 @@
       </ul>
       @if (lowStock().length > 5) { <p class="mt-2 text-xs text-slate-500">and {{ lowStock().length - 5 }} more</p> }
     </a>
-    <a routerLink="/admin/schedules" class="glass-panel block rounded-3xl p-5 hover:bg-white/70" aria-labelledby="on-shift-title">
+    <a routerLink="/admin/planner" class="glass-panel block rounded-3xl p-5 hover:bg-white/70" aria-labelledby="on-shift-title">
       <h2 id="on-shift-title" class="font-semibold text-slate-900">On shift today</h2>
       @if (!loading() && isWeekend) {
         <p class="mt-2 text-sm text-slate-500">No shifts on weekends.</p>
@@ -97,7 +97,7 @@
         }
       </ul>
     </a>
-    <a routerLink="/admin/tasks" class="glass-panel block rounded-3xl p-5 hover:bg-white/70" aria-labelledby="todays-tasks-title">
+    <a routerLink="/admin/planner" class="glass-panel block rounded-3xl p-5 hover:bg-white/70" aria-labelledby="todays-tasks-title">
       <div class="flex items-center justify-between">
         <h2 id="todays-tasks-title" class="font-semibold text-slate-900">Today’s tasks</h2>
         @if (unassignedToday() > 0) { <span class="badge bg-amber-100 text-amber-900">{{ unassignedToday() }} unassigned</span> }

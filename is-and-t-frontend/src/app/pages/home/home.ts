@@ -49,7 +49,7 @@ export class Home implements OnInit, OnDestroy {
       start: s.start, end: s.end, kind: 'shift', label: s.extra ? 'Extra shift' : 'On shift', detail: '',
     }));
     const tasks: TimelineEntry[] = day.tasks.map((t) => ({
-      start: t.startTime, end: t.endTime, kind: 'task', label: t.title, detail: `${t.building} ${t.room}`, task: t,
+      start: t.startTime, end: t.endTime, kind: 'task', label: t.title, detail: t.location, task: t,
     }));
     return [...shifts, ...tasks].sort((a, b) => a.start.localeCompare(b.start) || (a.kind === 'shift' ? -1 : 1));
   });

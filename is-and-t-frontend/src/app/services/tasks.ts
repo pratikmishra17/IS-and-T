@@ -17,6 +17,24 @@ export interface PlannedItem {
   status: 'RESERVED' | 'FULFILLED' | 'BACKORDERED' | 'RELEASED';
 }
 
+/** Something to bring to a task: any text, with a quantity. */
+export interface Supply {
+  name: string;
+  quantity: number;
+}
+
+/** Offered as one-click choices and while typing; anything else can be typed too. */
+export const SUPPLY_SUGGESTIONS = [
+  'Ultrawide', 'Dual Monitors', 'Dual Monitors (Both C-type)', 'Dual Monitors (Both Non C-type)',
+  'Single Monitor (C-type)', 'Single Monitor (Non C-type)', 'Macbook', '14" Laptop', '15" Laptop',
+  '16" Laptop', '17" Laptop', 'Keyboard', 'Mouse', 'Webcam',
+];
+
+/** "2 × Dual Monitors, Webcam" */
+export function suppliesText(supplies: Supply[]): string {
+  return supplies.map((s) => (s.quantity === 1 ? s.name : `${s.quantity} × ${s.name}`)).join(', ');
+}
+
 /** A task. date/startTime/endTime are campus time ("2026-10-21", "09:30"). */
 export interface Task {
   id: number;
@@ -27,9 +45,12 @@ export interface Task {
   startTime: string;
   endTime: string;
   durationMinutes: number;
-  building: string;
-  room: string;
-  employee: { name: string; email: string | null; phone: string | null; department: string | null };
+  /** Where it happens, typed freely ("BU 201"). */
+  location: string;
+  /** Who it's for; every field may be empty. */
+  employee: { name: string | null; email: string | null; phone: string | null };
+  /** Things to bring, typed by the admin. */
+  supplies: Supply[];
   status: TaskStatus;
   assignee: { id: number; name: string } | null;
   claimedOffShift: boolean;
@@ -46,12 +67,13 @@ export interface TaskRequest {
   date: string;
   startTime: string;
   durationMinutes: number;
-  building: string;
-  room: string;
+  location: string;
   employeeName: string;
   employeeEmail: string;
   employeePhone: string;
-  employeeDepartment: string;
+  supplies: Supply[];
+  /** New tasks only: false leaves it unassigned instead of giving it to the least busy student on shift. */
+  autoAssign?: boolean;
   items: { itemId: number | null; locationId: number | null; quantity: number }[];
   parentTaskId: number | null;
 }

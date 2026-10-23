@@ -17,6 +17,7 @@ import com.isandt.backend.schedule.ShiftCalendar;
 import com.isandt.backend.task.StudentTaskService;
 import com.isandt.backend.task.TaskResponses.TaskResponse;
 import com.isandt.backend.task.TaskStatus;
+import com.isandt.backend.task.TaskText;
 import com.isandt.backend.user.Student;
 import com.isandt.backend.user.StudentRepository;
 
@@ -93,11 +94,7 @@ public class CalendarFeedService {
 						task.date().atTime(task.startTime()).atZone(zone).toInstant(),
 						task.date().atTime(task.endTime()).atZone(zone).toInstant(),
 						(task.status() == TaskStatus.COMPLETED ? "✓ " : "") + task.title(),
-						task.building() + " " + task.room(),
-						"Employee: " + task.employee().name()
-								+ (task.employee().phone() == null ? "" : ", " + task.employee().phone())
-								+ (task.description() == null ? "" : "\n" + task.description())
-								+ "\n" + frontendUrl + "/tasks");
+						task.location(), details(task));
 			}
 		}
 		return ics.finish();
@@ -116,6 +113,23 @@ public class CalendarFeedService {
 
 	private Student student(Long id) {
 		return students.findById(id).orElseThrow(() -> new NotFoundException("Student not found."));
+	}
+
+	/** The event's notes: the employee, what to bring, the description, and a link to the task. */
+	private String details(TaskResponse task) {
+		String employee = TaskText.employee(task.employee().name(), task.employee().email(), task.employee().phone());
+		String bring = TaskText.supplies(task.supplies());
+		StringBuilder text = new StringBuilder();
+		if (employee != null) {
+			text.append("Employee: ").append(employee).append('\n');
+		}
+		if (bring != null) {
+			text.append("Bring: ").append(bring).append('\n');
+		}
+		if (task.description() != null) {
+			text.append(task.description()).append('\n');
+		}
+		return text.append(frontendUrl).append("/tasks").toString();
 	}
 
 }

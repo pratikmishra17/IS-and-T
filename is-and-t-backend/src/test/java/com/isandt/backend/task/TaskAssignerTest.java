@@ -81,7 +81,7 @@ class TaskAssignerTest {
 
 	private static Task task(Long id, String start, int minutes) {
 		Task task = new Task(new TaskRequest(TaskType.FIX, "Fix printer", null, MONDAY, LocalTime.parse(start), minutes,
-				"RT", "1408", "Pat Employee", null, null, null, List.of(), null), CLEVELAND, null);
+				"RT 1408", "Pat Employee", null, null, List.of(), List.of(), null, null), CLEVELAND, null);
 		ReflectionTestUtils.setField(task, "id", id);
 		return task;
 	}

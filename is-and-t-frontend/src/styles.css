@@ -26,7 +26,7 @@
 
   /* Bars and menus that sit over content: more opaque, so text behind doesn't show through */
   --bar-fill: rgb(240 244 243 / 0.78);
-  --menu-fill: rgb(246 249 248 / 0.9);
+  --menu-fill: rgb(246 249 248 / 0.97);
 
   /* Controls: resting, hovered (the "pane of glass"), and selected */
   --control-fill: rgb(255 255 255 / 0.5);
@@ -63,7 +63,7 @@
     radial-gradient(44rem 34rem at 70% 105%, oklch(90% 0.06 230 / 0.75), transparent 70%),
     #eff0f7;
   --bar-fill: rgb(240 241 248 / 0.78);
-  --menu-fill: rgb(246 246 251 / 0.9);
+  --menu-fill: rgb(246 246 251 / 0.97);
   --dialog-fill: rgb(246 246 251 / 0.92);
   --accent-from: #6466f1;
   --accent-to: #4338ca;
@@ -84,7 +84,7 @@
   --glass-shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 24px 70px -24px rgb(0 0 0 / 0.75);
   --glass-highlight: rgb(255 255 255 / 0.16);
   --bar-fill: rgb(12 17 28 / 0.72);
-  --menu-fill: rgb(22 28 42 / 0.92);
+  --menu-fill: rgb(22 28 42 / 0.97);
   --control-fill: rgb(255 255 255 / 0.07);
   --hover-fill: color-mix(in oklab, var(--color-teal-700) 22%, rgb(255 255 255 / 0.1));
   --active-fill: rgb(255 255 255 / 0.16);
@@ -113,7 +113,7 @@
     radial-gradient(44rem 34rem at 70% 105%, oklch(36% 0.09 240 / 0.5), transparent 70%),
     #080816;
   --bar-fill: rgb(13 13 30 / 0.72);
-  --menu-fill: rgb(24 24 44 / 0.92);
+  --menu-fill: rgb(24 24 44 / 0.97);
   --dialog-fill: rgb(22 22 42 / 0.92);
   --accent-from: #6d6af0;
   --accent-to: #4338ca;
@@ -494,5 +494,70 @@ html.theme-fade * {
 @media (prefers-reduced-motion: reduce) {
   .admin-sidebar {
     transition: none;
+  }
+}
+
+/* ---- The weekly shift grid (ShiftWeekEditor) ---- */
+
+/* A day column: a faint line every hour (background-size is set to two rows in the template) */
+.shift-column {
+  touch-action: none; /* dragging paints shifts instead of scrolling the page */
+  background-image: linear-gradient(to bottom, rgb(100 116 139 / 0.2) 1px, transparent 1px);
+  background-color: rgb(255 255 255 / 0.18);
+}
+
+:root[data-theme='dark'] .shift-column {
+  background-image: linear-gradient(to bottom, rgb(255 255 255 / 0.08) 1px, transparent 1px);
+  background-color: rgb(255 255 255 / 0.03);
+}
+
+/* A shift: a tinted piece of glass in the portal's colour */
+.shift-block {
+  background: linear-gradient(160deg, var(--accent-from), var(--accent-to));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.35), 0 4px 12px -4px var(--accent-glow);
+  cursor: grab;
+  touch-action: none;
+}
+
+.shift-block:active {
+  cursor: grabbing;
+}
+
+/* Overlapping a class: red, so it's noticed before saving */
+.shift-block.clash {
+  background: linear-gradient(160deg, #f43f5e, #be123c);
+}
+
+.shift-block.is-selected {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+
+/* A class: hatched grey, so shifts can be painted around it */
+.shift-class {
+  background: repeating-linear-gradient(135deg, rgb(100 116 139 / 0.28) 0 5px, rgb(100 116 139 / 0.1) 5px 10px);
+}
+
+/* A wider side panel, for content that needs room (the shift grid) */
+.side-panel.side-panel-wide {
+  width: min(46rem, 100vw);
+}
+
+/* A task just created or changed, outlined on the Planner for a few seconds */
+.task-highlight {
+  outline: 2px solid var(--accent-edge);
+  outline-offset: 2px;
+  animation: task-pulse 1.2s ease-in-out 3;
+}
+
+@keyframes task-pulse {
+  50% {
+    outline-offset: 5px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .task-highlight {
+    animation: none;
   }
 }

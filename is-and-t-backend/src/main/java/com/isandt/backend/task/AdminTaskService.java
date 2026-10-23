@@ -104,7 +104,9 @@ public class AdminTaskService {
 		workflow.record(task, TaskEventType.CREATED, actor,
 				request.parentTaskId() == null ? null : "Follow-up of task #" + request.parentTaskId());
 		warnings.addAll(dateWarnings(task));
-		workflow.autoAssign(task, actor, Set.of()).ifPresent(warnings::add);
+		if (request.assignAutomatically()) {
+			workflow.autoAssign(task, actor, Set.of()).ifPresent(warnings::add);
+		}
 		return new Saved<>(workflow.describe(task), warnings);
 	}
 

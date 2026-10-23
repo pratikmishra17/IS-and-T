@@ -10,7 +10,7 @@ let nextId = 0;
 @Component({
   selector: 'app-side-panel',
   template: `
-    <dialog #dialog class="app-dialog side-panel p-0" [attr.aria-labelledby]="titleId" (close)="closed.emit()">
+    <dialog #dialog class="app-dialog side-panel p-0" [class.side-panel-wide]="wide()" [attr.aria-labelledby]="titleId" (close)="closed.emit()">
       <div class="flex h-full flex-col">
         <header class="flex items-center justify-between border-b border-slate-200/70 px-6 py-4">
           <h2 [id]="titleId" class="text-lg font-semibold text-slate-900">{{ title() }}</h2>
@@ -26,6 +26,8 @@ let nextId = 0;
 export class SidePanel {
   readonly open = input(false);
   readonly title = input.required<string>();
+  /** Wider, for content that needs the room (the schedules page's shift grid). */
+  readonly wide = input(false);
   readonly closed = output<void>();
   protected readonly titleId = `side-panel-title-${++nextId}`;
   private readonly dialog = viewChild.required<ElementRef<HTMLDialogElement>>('dialog');

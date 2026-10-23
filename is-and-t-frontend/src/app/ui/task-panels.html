@@ -1,0 +1,206 @@
+<!-- ========== Task detail ========== -->
+<app-side-panel [open]="!!detail()" [title]="detail()?.task?.title ?? ''" (closed)="detail.set(null)">
+  @if (detail(); as d) {
+    <div class="space-y-5 text-sm">
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="badge" [class]="d.task.status === 'UNASSIGNED' ? 'bg-amber-100 text-amber-900' : d.task.status === 'COMPLETED' ? 'bg-teal-100 text-teal-900' : 'bg-slate-200 text-slate-700'">{{ statusLabel[d.task.status] }}@if (d.task.assignee) { to {{ d.task.assignee.name }} }</span>
+        <span class="badge bg-white/70 text-slate-700">{{ d.task.type === 'DEPLOYMENT' ? 'Deployment' : 'Fix' }}</span>
+        @if (d.task.parentTaskId) { <span class="badge bg-white/70 text-slate-700">Follow-up of #{{ d.task.parentTaskId }}</span> }
+      </div>
+
+      <dl class="grid grid-cols-[6rem_1fr] gap-x-3 gap-y-1.5">
+        <dt class="text-slate-500">When</dt><dd class="text-slate-900">{{ d.task.date | date: 'EEEE, MMMM d' }}, {{ d.task.startTime }}–{{ d.task.endTime }}</dd>
+        <dt class="text-slate-500">Where</dt><dd class="text-slate-900">{{ d.task.location }}</dd>
+        @if (d.task.employee.name || d.task.employee.email || d.task.employee.phone) {
+          <dt class="text-slate-500">Employee</dt>
+          <dd class="text-slate-900">{{ d.task.employee.name }}
+            @if (d.task.employee.email) { <br /><a class="text-teal-900 underline" [href]="'mailto:' + d.task.employee.email">{{ d.task.employee.email }}</a> }
+            @if (d.task.employee.phone) { <br />{{ d.task.employee.phone }} }
+          </dd>
+        }
+        @if (d.task.supplies.length > 0) {
+          <dt class="text-slate-500">Bring</dt>
+          <dd class="text-slate-900">
+            <ul>@for (supply of d.task.supplies; track $index) { <li>{{ supply.quantity > 1 ? supply.quantity + ' × ' : '' }}{{ supply.name }}</li> }</ul>
+          </dd>
+        }
+      </dl>
+      @if (d.task.description) { <p class="whitespace-pre-line rounded-2xl bg-white/50 px-3 py-2 text-slate-700">{{ d.task.description }}</p> }
+
+      <div>
+        <label for="task-assignee" class="field-label">Student</label>
+        @if (isOpen(d.task)) {
+          <!-- [selected] on each option (not [value] on the select), so the current student is always the one shown -->
+          <select id="task-assignee" class="glass-input w-full rounded-xl px-3 py-2.5 text-sm" [disabled]="busy()" (change)="assign($any($event.target).value)">
+            <option value="none" [selected]="!d.task.assignee">Unassigned</option>
+            @for (c of candidates(); track c.id) {
+              <option [value]="c.id" [selected]="c.id === d.task.assignee?.id">{{ c.name }}{{ c.eligible ? ' ✓ on shift' : ' (not on shift / busy)' }}</option>
+            }
+          </select>
+          @if (d.task.claimedOffShift) { <p class="mt-1 text-xs text-amber-800">⚠ Claimed while not on shift for the whole task.</p> }
+        } @else {
+          <p id="task-assignee" class="text-slate-900">{{ d.task.assignee?.name ?? '—' }}</p>
+        }
+      </div>
+
+      @if (detailWarnings().length > 0) {
+        <ul role="status" class="space-y-1 rounded-2xl bg-amber-50/90 px-4 py-3 text-amber-950">
+          @for (w of detailWarnings(); track $index) { <li>⚠ {{ w }}</li> }
+        </ul>
+      }
+
+      @if (d.task.items.length > 0) {
+        <div>
+          <h3 class="text-xs font-semibold uppercase tracking-widest text-slate-500">Items</h3>
+          <ul class="mt-1 divide-y divide-slate-200/60">
+            @for (item of d.task.items; track item.id) {
+              <li class="flex justify-between gap-2 py-1.5">
+                <span>{{ item.quantityPlanned }} × {{ item.itemName }} <span class="text-slate-500">from {{ item.locationLabel }}</span></span>
+                <span class="shrink-0 text-xs font-semibold" [class.text-amber-800]="item.status === 'BACKORDERED'" [class.text-slate-500]="item.status !== 'BACKORDERED'">
+                  {{ item.status === 'RESERVED' ? 'Reserved' : item.status === 'FULFILLED' ? 'Used' : item.status === 'BACKORDERED' ? (item.quantityUsed ?? 0) + ' used, rest owed' : 'Released' }}
+                </span>
+              </li>
+            }
+          </ul>
+        </div>
+      }
+
+      @if (d.task.outcomeNotes) {
+        <div><h3 class="text-xs font-semibold uppercase tracking-widest text-slate-500">Notes from {{ d.task.assignee?.name ?? 'the student' }}</h3><p class="mt-1 whitespace-pre-line text-slate-700">{{ d.task.outcomeNotes }}</p></div>
+      }
+
+      <div class="flex flex-wrap gap-2">
+        @if (isOpen(d.task)) {
+          <button type="button" class="btn btn-quiet" (click)="openEdit(d.task)">Edit or reschedule</button>
+          <button type="button" class="btn btn-quiet text-rose-900" [disabled]="busy()" (click)="cancelTask()">Cancel task</button>
+        }
+        @if (d.task.status === 'COMPLETED' && hasBackorders(d.task)) {
+          <button type="button" class="btn submit-button text-white" (click)="openFollowUp(d.task)">Create follow-up for owed items</button>
+        }
+      </div>
+
+      <div class="border-t border-slate-200/70 pt-4">
+        <h3 class="text-xs font-semibold uppercase tracking-widest text-slate-500">History</h3>
+        <ol class="mt-2 space-y-2">
+          @for (event of d.history; track $index) {
+            <li class="border-l-2 border-teal-200 pl-3">
+              <p class="text-slate-800">{{ event.type.replace('_', ' ').toLowerCase() }}@if (event.detail) { <span class="text-slate-600">: {{ event.detail }}</span> }</p>
+              <p class="text-xs text-slate-500">{{ event.occurredAt | date: 'MMM d, h:mm a' }} · {{ event.actor }}</p>
+            </li>
+          }
+        </ol>
+      </div>
+    </div>
+  }
+</app-side-panel>
+
+<!-- ========== New / edit task ========== -->
+<app-side-panel [open]="formOpen()" [title]="editingId() ? 'Edit task' : draft.parentTaskId ? 'Follow-up deployment' : 'New task'" (closed)="formOpen.set(false)">
+  @if (formOpen()) {
+    <form #taskForm="ngForm" (ngSubmit)="save(taskForm)" class="space-y-4" novalidate>
+      <fieldset>
+        <legend class="field-label">Type</legend>
+        <div class="grid grid-cols-2 gap-2">
+          @for (option of [{ id: 'DEPLOYMENT', label: 'Deployment' }, { id: 'FIX', label: 'Fix' }]; track option.id) {
+            <label class="flex cursor-pointer items-center justify-center rounded-xl border px-3 py-2 text-sm font-medium" [class]="draft.type === option.id ? 'border-teal-700 bg-teal-50 text-teal-950' : 'border-white/80 bg-white/50 text-slate-700'">
+              <input type="radio" name="type" class="sr-only" [value]="option.id" [(ngModel)]="draft.type" />{{ option.label }}
+            </label>
+          }
+        </div>
+      </fieldset>
+      <div>
+        <label for="task-title" class="field-label">Title</label>
+        <input id="task-title" name="title" [(ngModel)]="draft.title" required maxlength="200" [placeholder]="draft.type === 'DEPLOYMENT' ? 'New hire setup: laptop, 2 monitors' : 'Printer not connecting'" class="glass-input w-full rounded-xl px-3 py-2.5 text-sm" />
+      </div>
+      <div class="grid grid-cols-3 gap-2">
+        <div><label for="task-date" class="field-label">Date</label><input id="task-date" name="date" type="date" [(ngModel)]="draft.date" required class="glass-input w-full rounded-xl px-2 py-2.5 text-sm" /></div>
+        <div><label for="task-start" class="field-label">Start</label><input id="task-start" name="startTime" type="time" [(ngModel)]="draft.startTime" required class="glass-input w-full rounded-xl px-2 py-2.5 text-sm" /></div>
+        <div><label for="task-duration" class="field-label">Minutes</label><input id="task-duration" name="durationMinutes" type="number" [(ngModel)]="draft.durationMinutes" required min="5" max="600" class="glass-input w-full rounded-xl px-2 py-2.5 text-sm" /></div>
+      </div>
+      <p class="-mt-2 text-xs text-slate-500">Include travel time. The student must be on shift for all of it.</p>
+      <div>
+        <label for="task-location" class="field-label">Location</label>
+        <input id="task-location" name="location" [(ngModel)]="draft.location" required maxlength="200" placeholder="Rhodes Tower 1408, BU 201…" class="glass-input w-full rounded-xl px-3 py-2.5 text-sm" />
+      </div>
+      @if (!editingId()) {
+        <div>
+          <label for="task-who" class="field-label">Who does it</label>
+          <select id="task-who" name="who" [(ngModel)]="who" class="glass-input w-full rounded-xl px-3 py-2.5 text-sm">
+            <option value="auto">Automatically: the least busy student on shift</option>
+            <option value="none">Nobody yet (leave it unassigned)</option>
+            @for (student of students(); track student.id) { <option [value]="'' + student.id">{{ student.firstName }} {{ student.lastName }}</option> }
+          </select>
+        </div>
+      }
+      <fieldset class="space-y-2 rounded-2xl border border-white/70 bg-white/40 p-3">
+        <legend class="px-1 text-sm font-medium text-slate-700">Employee <span class="font-normal text-slate-500">(optional)</span></legend>
+        <input name="employeeName" [(ngModel)]="draft.employeeName" maxlength="200" placeholder="Name" aria-label="Employee name" class="glass-input w-full rounded-xl px-3 py-2 text-sm" />
+        <div class="grid grid-cols-2 gap-2">
+          <input name="employeeEmail" type="email" email [(ngModel)]="draft.employeeEmail" maxlength="255" placeholder="Email" aria-label="Employee email" class="glass-input w-full rounded-xl px-3 py-2 text-sm" />
+          <input name="employeePhone" [(ngModel)]="draft.employeePhone" maxlength="50" placeholder="Phone" aria-label="Employee phone" class="glass-input w-full rounded-xl px-3 py-2 text-sm" />
+        </div>
+      </fieldset>
+      <div>
+        <label for="task-description" class="field-label">Details <span class="font-normal text-slate-500">(optional)</span></label>
+        <textarea id="task-description" name="description" [(ngModel)]="draft.description" maxlength="2000" rows="3" class="glass-input w-full rounded-xl px-3 py-2 text-sm"></textarea>
+      </div>
+      <fieldset>
+        <legend class="field-label">Things to bring <span class="font-normal text-slate-500">(optional)</span></legend>
+        <!-- One click adds a suggestion (or one more of it); anything else can be typed below -->
+        <div class="flex flex-wrap gap-1.5" role="group" aria-label="Suggestions">
+          @for (name of suggestions; track name) {
+            <button type="button" class="btn px-2.5 py-1 text-xs" [class.badge-solid]="countOf(name) > 0" [class.btn-quiet]="countOf(name) === 0" (click)="addSuggestion(name)">
+              {{ name }}@if (countOf(name) > 1) { <span>× {{ countOf(name) }}</span> }
+            </button>
+          }
+        </div>
+        <div class="mt-3 space-y-2">
+          @for (supply of draft.supplies; track $index; let i = $index) {
+            <div class="flex gap-2">
+              <input [name]="'supply-' + i" [(ngModel)]="supply.name" list="supply-suggestions" maxlength="100" placeholder="Type anything, e.g. Docking station" aria-label="Thing to bring" class="glass-input min-w-0 flex-1 rounded-lg px-2.5 py-1.5 text-sm" />
+              <input [name]="'supply-qty-' + i" type="number" min="1" max="99" [(ngModel)]="supply.quantity" aria-label="How many" class="glass-input w-16 rounded-lg px-2 py-1.5 text-sm" />
+              <button type="button" class="icon-button size-8" [attr.aria-label]="'Remove ' + (supply.name || 'this line')" (click)="removeSupplyRow(i)">✕</button>
+            </div>
+          }
+        </div>
+        <datalist id="supply-suggestions">
+          @for (name of suggestions; track name) { <option [value]="name"></option> }
+        </datalist>
+        <button type="button" class="text-glass mt-2 text-sm font-medium text-teal-900" (click)="addSupplyRow()">+ Type something else</button>
+      </fieldset>
+
+      @if ((items().length > 0 && rooms().length > 0) || draft.items.length > 0) {
+        <details class="rounded-2xl border border-white/70 bg-white/40 p-3" [open]="draft.items.length > 0">
+          <summary class="cursor-pointer text-sm font-medium text-slate-700">Reserve from stock <span class="font-normal text-slate-500">(optional: sets inventory items aside for this task)</span></summary>
+          <div class="mt-2 space-y-2">
+            @for (line of draft.items; track $index; let i = $index) {
+              <div class="rounded-xl border border-white/70 bg-white/40 p-2">
+                <div class="flex gap-2">
+                  <select [name]="'item-' + i" [(ngModel)]="line.itemId" aria-label="Item" class="glass-input min-w-0 flex-1 rounded-lg px-2 py-1.5 text-sm">
+                    @for (item of items(); track item.id) { <option [ngValue]="item.id">{{ item.name }}</option> }
+                  </select>
+                  <input [name]="'qty-' + i" type="number" min="1" max="1000" [(ngModel)]="line.quantity" aria-label="Quantity" class="glass-input w-16 rounded-lg px-2 py-1.5 text-sm" />
+                  <button type="button" class="icon-button size-8" aria-label="Remove this item" (click)="removeItemRow(i)">✕</button>
+                </div>
+                <div class="mt-1.5 flex items-center gap-2">
+                  <select [name]="'room-' + i" [(ngModel)]="line.locationId" aria-label="Take from room" class="glass-input min-w-0 flex-1 rounded-lg px-2 py-1.5 text-xs">
+                    @for (room of rooms(); track room.id) { <option [ngValue]="room.id">from {{ room.label }}</option> }
+                  </select>
+                  <span class="shrink-0 text-xs text-slate-500">{{ availability(line.itemId) }}</span>
+                </div>
+              </div>
+            }
+          </div>
+          @if (items().length > 0 && rooms().length > 0) {
+            <button type="button" class="text-glass mt-2 text-sm font-medium text-teal-900" (click)="addItemRow()">+ Reserve an item</button>
+          }
+        </details>
+      }
+      @if (formError()) { <p role="alert" class="rounded-2xl bg-rose-50/90 px-4 py-3 text-sm text-rose-900">{{ formError() }}</p> }
+      <div class="flex justify-end gap-2 pt-1">
+        <button type="button" class="btn btn-quiet" (click)="formOpen.set(false)">Cancel</button>
+        <button type="submit" class="btn submit-button text-white" [disabled]="busy()">{{ busy() ? 'Saving…' : editingId() ? 'Save changes' : 'Create task' }}</button>
+      </div>
+    </form>
+  }
+</app-side-panel>

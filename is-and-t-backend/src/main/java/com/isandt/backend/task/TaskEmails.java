@@ -55,6 +55,9 @@ class TaskEmails {
 	}
 
 	private void send(Student student, String subject, String intro, Task task) {
+		String employee = TaskText.employee(task.getEmployeeName(), task.getEmployeeEmail(), task.getEmployeePhone());
+		String bring = TaskText.supplies(task.getSupplies().stream()
+			.map(supply -> new TaskResponses.SupplyResponse(supply.getName(), supply.getQuantity())).toList());
 		sender.send(new EmailMessage(student.getEmail(), subject, """
 				Hi %s,
 
@@ -62,13 +65,12 @@ class TaskEmails {
 
 				  %s
 				  When:     %s (%d min)
-				  Where:    %s %s
-				  Employee: %s%s%s
+				  Where:    %s%s%s
 
 				See your tasks: %s/tasks""".formatted(student.getFirstName(), intro, task.getTitle(),
-				task.getStartAt().atZone(zone).format(WHEN), task.getDurationMinutes(), task.getBuilding(), task.getRoom(),
-				task.getEmployeeName(), task.getEmployeeEmail() == null ? "" : ", " + task.getEmployeeEmail(),
-				task.getEmployeePhone() == null ? "" : ", " + task.getEmployeePhone(), frontendUrl)));
+				task.getStartAt().atZone(zone).format(WHEN), task.getDurationMinutes(), task.getLocation(),
+				employee == null ? "" : "\n  Employee: " + employee,
+				bring == null ? "" : "\n  Bring:    " + bring, frontendUrl)));
 	}
 
 	private static String kind(Task task) {

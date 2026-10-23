@@ -103,7 +103,7 @@ class StudentTaskServiceTest {
 
 	private static Task task() {
 		Task task = new Task(new TaskRequest(TaskType.DEPLOYMENT, "New laptop", null, LocalDate.of(2026, 10, 19), LocalTime.of(10, 0), 30,
-				"RT", "1408", "Pat Employee", null, null, null, List.of(), null), CLEVELAND, null);
+				"RT 1408", "Pat Employee", null, null, List.of(), List.of(), null, null), CLEVELAND, null);
 		ReflectionTestUtils.setField(task, "id", 5L);
 		return task;
 	}

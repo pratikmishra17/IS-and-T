@@ -1,0 +1,97 @@
+<app-side-panel [wide]="true" [open]="!!student()" [title]="(requestId() ? 'Review: ' : '') + (student()?.name ?? '')" (closed)="close()">
+  @if (student()) {
+    <div class="space-y-6">
+      <div>
+        <label for="panel-semester" class="field-label">Semester</label>
+        <select id="panel-semester" class="glass-input w-full rounded-xl px-3 py-2.5 text-sm" [disabled]="!!requestId()" [ngModel]="semesterId()" (ngModelChange)="load($event)">
+          @for (semester of semesters(); track semester.id) { <option [ngValue]="semester.id">{{ semester.name }} · {{ semester.weeklyHourLimit }} h/week</option> }
+        </select>
+      </div>
+
+      @if (panel(); as p) {
+        <div>
+          <h3 class="text-sm font-semibold uppercase tracking-widest text-slate-500">Classes</h3>
+          @if (p.classes.length === 0) { <p class="mt-1 text-sm text-slate-500">None entered.</p> }
+          <div class="mt-2 flex flex-wrap gap-1">
+            @for (block of p.classes; track $index) { <span class="badge bg-slate-200/80 text-slate-700">{{ dayName(block.day).slice(0, 3) }} {{ block.start }}–{{ block.end }}</span> }
+          </div>
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-semibold uppercase tracking-widest text-slate-500">Asked for</h3>
+            @if (p.preferred.length > 0) { <button type="button" class="text-sm font-medium text-teal-900 hover:underline" (click)="usePreferred()">Use these as shifts</button> }
+          </div>
+          @if (p.preferred.length === 0) { <p class="mt-1 text-sm text-slate-500">Nothing submitted.</p> }
+          <div class="mt-2 flex flex-wrap gap-1">
+            @for (block of p.preferred; track $index) { <span class="badge bg-amber-100/80 text-amber-950">{{ dayName(block.day).slice(0, 3) }} {{ block.start }}–{{ block.end }}</span> }
+          </div>
+        </div>
+
+        <div>
+          <h3 class="text-sm font-semibold uppercase tracking-widest text-slate-500">Weekly shifts</h3>
+          <div class="mt-2"><app-shift-week-editor [(blocks)]="shifts" [classes]="p.classes" [preferred]="p.preferred" [limit]="p.semester.weeklyHourLimit" /></div>
+          @if (shiftHours() > p.semester.weeklyHourLimit) {
+            <p class="mt-2 text-sm text-amber-800">{{ shiftHours() }} h is over the {{ p.semester.weeklyHourLimit }} h limit. You can still save.</p>
+          }
+          <button type="button" class="btn submit-button mt-3 w-full text-white" [disabled]="saving()" (click)="saveShifts()">
+            {{ saving() ? 'Saving…' : (requestId() ? 'Approve and email ' + p.studentName.split(' ')[0] : 'Save shifts') }}
+          </button>
+        </div>
+
+        @if (warnings().length > 0) {
+          <ul role="status" class="space-y-1 rounded-2xl bg-amber-50/90 px-4 py-3 text-sm text-amber-950">
+            @for (warning of warnings(); track $index) { <li>⚠ {{ warning }}</li> }
+          </ul>
+        }
+        @if (error()) { <p role="alert" class="rounded-2xl bg-rose-50/90 px-4 py-3 text-sm text-rose-900">{{ error() }}</p> }
+
+        <div class="border-t border-slate-200/70 pt-5">
+          <h3 class="text-sm font-semibold uppercase tracking-widest text-slate-500">One-off changes</h3>
+          @if (p.exceptions.length === 0) { <p class="mt-1 text-sm text-slate-500">None this semester.</p> }
+          <ul class="mt-2 divide-y divide-slate-200/60">
+            @for (change of p.exceptions; track change.id) {
+              <li class="flex items-center justify-between gap-2 py-2 text-sm">
+                <span>
+                  <span class="font-medium text-slate-800">{{ change.date | date: 'EEE, MMM d' }}</span>:
+                  {{ change.type === 'CANCEL' ? 'day off' : (change.type === 'OFF' ? 'off ' : 'extra ') + change.start + '–' + change.end }}
+                  @if (change.reason) { <span class="text-slate-500">({{ change.reason }})</span> }
+                </span>
+                <button type="button" class="icon-button" [attr.aria-label]="'Delete the change on ' + change.date" (click)="deleteChange(change)">✕</button>
+              </li>
+            }
+          </ul>
+          <form #changeForm="ngForm" (ngSubmit)="addChange(changeForm)" class="mt-3 space-y-3 rounded-2xl border border-white/70 bg-white/40 p-3" novalidate>
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label for="change-date" class="field-label">Date</label>
+                <input id="change-date" name="date" type="date" [(ngModel)]="change.date" required class="glass-input w-full rounded-xl px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label for="change-type" class="field-label">Change</label>
+                <select id="change-type" name="type" [(ngModel)]="change.type" class="glass-input w-full rounded-xl px-3 py-2 text-sm">
+                  <option value="CANCEL">Day off</option>
+                  <option value="OFF">Time off (hours)</option>
+                  <option value="EXTRA">Extra shift</option>
+                </select>
+              </div>
+            </div>
+            @if (change.type !== 'CANCEL') {
+              <div class="grid grid-cols-2 gap-2">
+                <div><label for="change-start" class="field-label">From</label><input id="change-start" name="start" type="time" [(ngModel)]="change.start" required class="glass-input w-full rounded-xl px-3 py-2 text-sm" /></div>
+                <div><label for="change-end" class="field-label">To</label><input id="change-end" name="end" type="time" [(ngModel)]="change.end" required class="glass-input w-full rounded-xl px-3 py-2 text-sm" /></div>
+              </div>
+            }
+            <div>
+              <label for="change-reason" class="field-label">Reason <span class="font-normal text-slate-500">(optional)</span></label>
+              <input id="change-reason" name="reason" [(ngModel)]="change.reason" maxlength="255" placeholder="Exam, sick, covering for Rita…" class="glass-input w-full rounded-xl px-3 py-2 text-sm" />
+            </div>
+            <button type="submit" class="btn btn-quiet w-full" [disabled]="saving()">Add change</button>
+          </form>
+        </div>
+      } @else if (!error()) {
+        <p class="text-sm text-slate-500">Loading…</p>
+      }
+    </div>
+  }
+</app-side-panel>

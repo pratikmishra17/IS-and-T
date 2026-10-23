@@ -3,16 +3,22 @@
     <div class="min-w-0">
       <p class="text-xs font-semibold uppercase tracking-widest text-teal-800">{{ task.startTime }}–{{ task.endTime }} · {{ task.type === 'DEPLOYMENT' ? 'Deployment' : 'Fix' }}</p>
       <p class="mt-0.5 font-semibold text-slate-900">{{ task.title }}</p>
-      <p class="text-sm text-slate-600">{{ task.building }} {{ task.room }} · {{ task.employee.name }}</p>
+      <p class="text-sm text-slate-600">{{ task.location }}@if (task.employee.name) { · {{ task.employee.name }} }</p>
     </div>
     <button type="button" class="shrink-0 text-sm font-medium text-teal-900 hover:underline" [attr.aria-expanded]="expanded().has(task.id)" (click)="toggle(task)">{{ expanded().has(task.id) ? 'Less' : 'Details' }}</button>
   </div>
   @if (expanded().has(task.id)) {
     <div class="mt-3 space-y-2 rounded-xl bg-white/60 p-3 text-sm text-slate-700">
       @if (task.description) { <p class="whitespace-pre-line">{{ task.description }}</p> }
-      <p>
-        <span class="font-medium">{{ task.employee.name }}</span>@if (task.employee.department) { · {{ task.employee.department }} }
-      </p>
+      @if (task.employee.name) { <p class="font-medium">{{ task.employee.name }}</p> }
+      @if (task.supplies.length > 0) {
+        <div>
+          <p class="font-medium">Bring</p>
+          <ul class="mt-1 space-y-0.5">
+            @for (supply of task.supplies; track $index) { <li>• {{ supply.quantity > 1 ? supply.quantity + ' × ' : '' }}{{ supply.name }}</li> }
+          </ul>
+        </div>
+      }
       <div class="flex flex-wrap gap-2">
         @if (task.employee.phone) { <a class="btn btn-quiet px-3 py-1.5 text-xs" [href]="'tel:' + task.employee.phone">Call {{ task.employee.phone }}</a> }
         @if (task.employee.email) { <a class="btn btn-quiet px-3 py-1.5 text-xs" [href]="'mailto:' + task.employee.email">Email</a> }

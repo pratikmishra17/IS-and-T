@@ -99,13 +99,13 @@ public class DailyDigest {
 
 		List<String> lines = new ArrayList<>();
 		lines.add(section("Unassigned tasks today", unassigned.stream()
-				.map(t -> t.startTime() + "–" + t.endTime() + "  " + t.title() + " (" + t.building() + " " + t.room() + ")").toList(),
+				.map(t -> t.startTime() + "–" + t.endTime() + "  " + t.title() + " (" + t.location() + ")").toList(),
 				"None: every task today has someone."));
 		lines.add(section("Low stock", lowStock.stream()
 				.map(i -> i.name() + ": " + i.onHand() + " left (threshold " + i.lowStockThreshold() + ")").toList(),
 				"Nothing is low."));
 		lines.add(section("Backorders back in stock", refillable.stream()
-				.map(b -> b.missing() + " × " + b.itemName() + " for " + b.task().employee().name() + " (from \"" + b.task().title() + "\")").toList(),
+				.map(b -> b.missing() + " × " + b.itemName() + " for " + (b.task().employee().name() == null ? b.task().location() : b.task().employee().name()) + " (from \"" + b.task().title() + "\")").toList(),
 				"None."));
 		boolean allClear = unassigned.isEmpty() && lowStock.isEmpty() && refillable.isEmpty();
 		return (allClear ? "All clear today.\n\n" : "") + String.join("\n\n", lines) + "\n\nOpen the admin portal: " + frontendUrl + "/admin";

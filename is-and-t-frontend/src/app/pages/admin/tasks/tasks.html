@@ -1,17 +1,16 @@
 <div class="flex flex-wrap items-end justify-between gap-4">
   <div>
     <h1 class="text-3xl font-semibold tracking-tight text-slate-900">Tasks</h1>
-    <p class="mt-1 text-sm text-slate-600">Deployments and fixes. New tasks go automatically to the least busy student on shift for the whole time.</p>
+    <p class="mt-1 text-sm text-slate-600">Deployments and fixes. New tasks go automatically to the least busy student on shift for the whole time. See them with everyone’s shifts on the <a routerLink="/admin/planner" class="font-medium text-teal-900 underline">Planner</a>.</p>
   </div>
-  <button type="button" class="btn submit-button text-white" (click)="openNew()"><span aria-hidden="true">+</span> New task</button>
+  <button type="button" class="btn submit-button text-white" (click)="panels().openNew()"><span aria-hidden="true">+</span> New task</button>
 </div>
 
 <div class="mt-6 flex flex-wrap items-center justify-between gap-3">
   <div role="tablist" aria-label="Task views" class="inline-flex gap-1 rounded-2xl border border-white/60 bg-white/30 p-1">
-    @for (t of [{ id: 'week', label: 'Week' }, { id: 'list', label: 'List' }, { id: 'backorders', label: 'Backorders' }]; track t.id) {
+    @for (t of [{ id: 'list', label: 'List' }, { id: 'backorders', label: 'Backorders' }]; track t.id) {
       <button type="button" role="tab" class="rounded-xl px-4 py-2 text-sm font-medium text-slate-700 hover:bg-white/60" [class.bg-white]="tab() === t.id" [class.shadow-sm]="tab() === t.id" [attr.aria-selected]="tab() === t.id" (click)="switchTab($any(t.id))">
         {{ t.label }}
-        @if (t.id === 'week' && unassignedCount() > 0) { <span class="badge ml-1 bg-amber-100 text-amber-900">{{ unassignedCount() }} unassigned</span> }
       </button>
     }
   </div>
@@ -25,51 +24,11 @@
   }
 </div>
 
-<ng-template #card let-task>
-  <button type="button" class="block w-full cursor-pointer rounded-2xl border p-3 text-left text-sm transition hover:-translate-y-0.5 hover:shadow-md"
-    [class]="task.status === 'UNASSIGNED' ? 'border-amber-300 bg-amber-50/80' : task.status === 'ASSIGNED' ? 'border-white/80 bg-white/70' : task.status === 'COMPLETED' ? 'border-teal-200 bg-teal-50/70' : 'border-slate-200 bg-slate-100/70 opacity-70'"
-    (click)="open(task)">
-    <span class="block text-xs font-semibold text-slate-500">{{ task.startTime }}–{{ task.endTime }} · {{ task.type === 'DEPLOYMENT' ? 'Deployment' : 'Fix' }}</span>
-    <span class="mt-0.5 block font-medium text-slate-900" [class.line-through]="task.status === 'CANCELLED'">{{ task.title }}</span>
-    <span class="mt-0.5 block text-xs text-slate-600">{{ task.building }} {{ task.room }}</span>
-    <span class="mt-1.5 block text-xs font-semibold" [class.text-amber-800]="task.status === 'UNASSIGNED'" [class.text-slate-700]="task.status !== 'UNASSIGNED'">
-      {{ task.assignee ? task.assignee.name : 'Unassigned' }}
-      @if (task.status !== 'UNASSIGNED' && task.status !== 'ASSIGNED') { · {{ label(task.status) }} }
-      @if (task.claimedOffShift) { <span title="Claimed while not on shift for the whole task">⚠</span> }
-    </span>
-  </button>
-</ng-template>
-
 <section class="glass-panel mt-4 rounded-3xl p-4 sm:p-6">
   @if (loading()) {
     <p class="py-12 text-center text-sm text-slate-500">Loading…</p>
   } @else {
     @switch (tab()) {
-      @case ('week') {
-        <div class="overflow-x-auto">
-          <div class="grid min-w-[52rem] grid-cols-5 gap-3">
-            @for (day of days(); track day) {
-              <div class="flex min-h-48 flex-col rounded-2xl p-2" [class.bg-teal-50]="day === today" [class.bg-white]="day !== today" [class.bg-opacity-30]="day !== today">
-                <div class="mb-2 flex items-center justify-between px-1">
-                  <span class="text-xs font-semibold uppercase tracking-widest" [class.text-teal-900]="day === today" [class.text-slate-500]="day !== today">{{ day | date: 'EEE d' }}</span>
-                  <button type="button" class="icon-button size-7" [attr.aria-label]="'New task on ' + day" title="New task on this day" (click)="openNew(day)">+</button>
-                </div>
-                <div class="flex flex-col gap-2">
-                  @for (task of byDay().get(day); track task.id) { <ng-container *ngTemplateOutlet="card; context: { $implicit: task }" /> }
-                  @if (byDay().get(day)?.length === 0) { <p class="px-1 text-xs text-slate-400">No tasks</p> }
-                </div>
-              </div>
-            }
-          </div>
-        </div>
-        @if (weekendTasks().length > 0) {
-          <h2 class="mt-5 text-xs font-semibold uppercase tracking-widest text-slate-500">Weekend</h2>
-          <div class="mt-2 grid gap-2 sm:grid-cols-3">
-            @for (task of weekendTasks(); track task.id) { <ng-container *ngTemplateOutlet="card; context: { $implicit: task }" /> }
-          </div>
-        }
-      }
-
       @case ('list') {
         <div class="flex justify-end">
           <label class="sr-only" for="task-status">Status</label>
@@ -94,10 +53,10 @@
               </thead>
               <tbody class="divide-y divide-slate-200/60">
                 @for (task of listed(); track task.id) {
-                  <tr class="cursor-pointer hover:bg-white/40" (click)="open(task)">
+                  <tr class="cursor-pointer hover:bg-white/40" (click)="panels().open(task)">
                     <td class="px-3 py-3 text-slate-700">{{ task.date | date: 'EEE MMM d' }}<br /><span class="text-xs text-slate-500">{{ task.startTime }}–{{ task.endTime }}</span></td>
-                    <td class="px-3 py-3"><span class="font-medium text-slate-900">{{ task.title }}</span><br /><span class="text-xs text-slate-500">{{ task.type === 'DEPLOYMENT' ? 'Deployment' : 'Fix' }} · {{ task.building }} {{ task.room }}</span></td>
-                    <td class="px-3 py-3 text-slate-700">{{ task.employee.name }}</td>
+                    <td class="px-3 py-3"><span class="font-medium text-slate-900">{{ task.title }}</span><br /><span class="text-xs text-slate-500">{{ task.type === 'DEPLOYMENT' ? 'Deployment' : 'Fix' }} · {{ task.location }}</span></td>
+                    <td class="px-3 py-3 text-slate-700">{{ task.employee.name ?? '—' }}</td>
                     <td class="px-3 py-3 text-slate-700">{{ task.assignee?.name ?? '—' }}</td>
                     <td class="px-3 py-3"><span class="badge" [class]="task.status === 'UNASSIGNED' ? 'bg-amber-100 text-amber-900' : task.status === 'COMPLETED' ? 'bg-teal-100 text-teal-900' : 'bg-slate-200 text-slate-700'">{{ statusLabel[task.status] }}</span></td>
                   </tr>
@@ -116,11 +75,11 @@
             @for (b of backorders(); track b.plannedItemId) {
               <li class="flex flex-wrap items-center justify-between gap-3 py-3">
                 <div>
-                  <p class="font-medium text-slate-900">{{ b.missing }} × {{ b.itemName }} <span class="font-normal text-slate-500">for {{ b.task.employee.name }}</span></p>
-                  <p class="text-sm text-slate-500">From “{{ b.task.title }}” on {{ b.task.date | date: 'MMM d' }} · {{ b.task.building }} {{ b.task.room }}</p>
+                  <p class="font-medium text-slate-900">{{ b.missing }} × {{ b.itemName }} <span class="font-normal text-slate-500">for {{ b.task.employee.name ?? b.task.location }}</span></p>
+                  <p class="text-sm text-slate-500">From “{{ b.task.title }}” on {{ b.task.date | date: 'MMM d' }} · {{ b.task.location }}</p>
                   <p class="mt-1 text-xs font-semibold" [class.text-teal-800]="b.availableNow >= b.missing" [class.text-amber-800]="b.availableNow < b.missing">{{ b.availableNow >= b.missing ? 'Back in stock (' + b.availableNow + ' available)' : 'Still short (' + b.availableNow + ' available)' }}</p>
                 </div>
-                <button type="button" class="btn submit-button text-white" (click)="openFollowUp(b.task)">Create follow-up</button>
+                <button type="button" class="btn submit-button text-white" (click)="panels().openFollowUp(b.task)">Create follow-up</button>
               </li>
             }
           </ul>
@@ -130,164 +89,4 @@
   }
 </section>
 
-<!-- ========== Task detail ========== -->
-<app-side-panel [open]="!!detail()" [title]="detail()?.task?.title ?? ''" (closed)="detail.set(null)">
-  @if (detail(); as d) {
-    <div class="space-y-5 text-sm">
-      <div class="flex flex-wrap items-center gap-2">
-        <span class="badge" [class]="d.task.status === 'UNASSIGNED' ? 'bg-amber-100 text-amber-900' : d.task.status === 'COMPLETED' ? 'bg-teal-100 text-teal-900' : 'bg-slate-200 text-slate-700'">{{ statusLabel[d.task.status] }}</span>
-        <span class="badge bg-white/70 text-slate-700">{{ d.task.type === 'DEPLOYMENT' ? 'Deployment' : 'Fix' }}</span>
-        @if (d.task.parentTaskId) { <span class="badge bg-white/70 text-slate-700">Follow-up of #{{ d.task.parentTaskId }}</span> }
-      </div>
-
-      <dl class="grid grid-cols-[6rem_1fr] gap-x-3 gap-y-1.5">
-        <dt class="text-slate-500">When</dt><dd class="text-slate-900">{{ d.task.date | date: 'EEEE, MMMM d' }}, {{ d.task.startTime }}–{{ d.task.endTime }}</dd>
-        <dt class="text-slate-500">Where</dt><dd class="text-slate-900">{{ d.task.building }} {{ d.task.room }}</dd>
-        <dt class="text-slate-500">Employee</dt>
-        <dd class="text-slate-900">{{ d.task.employee.name }}@if (d.task.employee.department) { · {{ d.task.employee.department }} }
-          @if (d.task.employee.email) { <br /><a class="text-teal-900 underline" [href]="'mailto:' + d.task.employee.email">{{ d.task.employee.email }}</a> }
-          @if (d.task.employee.phone) { <br />{{ d.task.employee.phone }} }
-        </dd>
-      </dl>
-      @if (d.task.description) { <p class="whitespace-pre-line rounded-2xl bg-white/50 px-3 py-2 text-slate-700">{{ d.task.description }}</p> }
-
-      <div>
-        <label for="task-assignee" class="field-label">Student</label>
-        @if (isOpen(d.task)) {
-          <select id="task-assignee" class="glass-input w-full rounded-xl px-3 py-2.5 text-sm" [disabled]="busy()" [value]="d.task.assignee?.id ?? 'none'" (change)="assign($any($event.target).value)">
-            <option value="none">Unassigned</option>
-            @for (c of candidates(); track c.id) { <option [value]="c.id">{{ c.name }}{{ c.eligible ? ' ✓ on shift' : ' (not on shift / busy)' }}</option> }
-          </select>
-          @if (d.task.claimedOffShift) { <p class="mt-1 text-xs text-amber-800">⚠ Claimed while not on shift for the whole task.</p> }
-        } @else {
-          <p id="task-assignee" class="text-slate-900">{{ d.task.assignee?.name ?? '—' }}</p>
-        }
-      </div>
-
-      @if (detailWarnings().length > 0) {
-        <ul role="status" class="space-y-1 rounded-2xl bg-amber-50/90 px-4 py-3 text-amber-950">
-          @for (w of detailWarnings(); track $index) { <li>⚠ {{ w }}</li> }
-        </ul>
-      }
-
-      @if (d.task.items.length > 0) {
-        <div>
-          <h3 class="text-xs font-semibold uppercase tracking-widest text-slate-500">Items</h3>
-          <ul class="mt-1 divide-y divide-slate-200/60">
-            @for (item of d.task.items; track item.id) {
-              <li class="flex justify-between gap-2 py-1.5">
-                <span>{{ item.quantityPlanned }} × {{ item.itemName }} <span class="text-slate-500">from {{ item.locationLabel }}</span></span>
-                <span class="shrink-0 text-xs font-semibold" [class.text-amber-800]="item.status === 'BACKORDERED'" [class.text-slate-500]="item.status !== 'BACKORDERED'">
-                  {{ item.status === 'RESERVED' ? 'Reserved' : item.status === 'FULFILLED' ? 'Used' : item.status === 'BACKORDERED' ? (item.quantityUsed ?? 0) + ' used, rest owed' : 'Released' }}
-                </span>
-              </li>
-            }
-          </ul>
-        </div>
-      }
-
-      @if (d.task.outcomeNotes) {
-        <div><h3 class="text-xs font-semibold uppercase tracking-widest text-slate-500">Notes from {{ d.task.assignee?.name ?? 'the student' }}</h3><p class="mt-1 whitespace-pre-line text-slate-700">{{ d.task.outcomeNotes }}</p></div>
-      }
-
-      <div class="flex flex-wrap gap-2">
-        @if (isOpen(d.task)) {
-          <button type="button" class="btn btn-quiet" (click)="openEdit(d.task)">Edit or reschedule</button>
-          <button type="button" class="btn btn-quiet text-rose-900" [disabled]="busy()" (click)="cancelTask()">Cancel task</button>
-        }
-        @if (d.task.status === 'COMPLETED' && hasBackorders(d.task)) {
-          <button type="button" class="btn submit-button text-white" (click)="openFollowUp(d.task)">Create follow-up for owed items</button>
-        }
-      </div>
-
-      <div class="border-t border-slate-200/70 pt-4">
-        <h3 class="text-xs font-semibold uppercase tracking-widest text-slate-500">History</h3>
-        <ol class="mt-2 space-y-2">
-          @for (event of d.history; track $index) {
-            <li class="border-l-2 border-teal-200 pl-3">
-              <p class="text-slate-800">{{ event.type.replace('_', ' ').toLowerCase() }}@if (event.detail) { <span class="text-slate-600">: {{ event.detail }}</span> }</p>
-              <p class="text-xs text-slate-500">{{ event.occurredAt | date: 'MMM d, h:mm a' }} · {{ event.actor }}</p>
-            </li>
-          }
-        </ol>
-      </div>
-    </div>
-  }
-</app-side-panel>
-
-<!-- ========== New / edit task ========== -->
-<app-side-panel [open]="formOpen()" [title]="editingId() ? 'Edit task' : draft.parentTaskId ? 'Follow-up deployment' : 'New task'" (closed)="formOpen.set(false)">
-  @if (formOpen()) {
-    <form #taskForm="ngForm" (ngSubmit)="save(taskForm)" class="space-y-4" novalidate>
-      <fieldset>
-        <legend class="field-label">Type</legend>
-        <div class="grid grid-cols-2 gap-2">
-          @for (option of [{ id: 'DEPLOYMENT', label: 'Deployment' }, { id: 'FIX', label: 'Fix' }]; track option.id) {
-            <label class="flex cursor-pointer items-center justify-center rounded-xl border px-3 py-2 text-sm font-medium" [class]="draft.type === option.id ? 'border-teal-700 bg-teal-50 text-teal-950' : 'border-white/80 bg-white/50 text-slate-700'">
-              <input type="radio" name="type" class="sr-only" [value]="option.id" [(ngModel)]="draft.type" />{{ option.label }}
-            </label>
-          }
-        </div>
-      </fieldset>
-      <div>
-        <label for="task-title" class="field-label">Title</label>
-        <input id="task-title" name="title" [(ngModel)]="draft.title" required maxlength="200" [placeholder]="draft.type === 'DEPLOYMENT' ? 'New hire setup: laptop, 2 monitors' : 'Printer not connecting'" class="glass-input w-full rounded-xl px-3 py-2.5 text-sm" />
-      </div>
-      <div class="grid grid-cols-3 gap-2">
-        <div><label for="task-date" class="field-label">Date</label><input id="task-date" name="date" type="date" [(ngModel)]="draft.date" required class="glass-input w-full rounded-xl px-2 py-2.5 text-sm" /></div>
-        <div><label for="task-start" class="field-label">Start</label><input id="task-start" name="startTime" type="time" [(ngModel)]="draft.startTime" required class="glass-input w-full rounded-xl px-2 py-2.5 text-sm" /></div>
-        <div><label for="task-duration" class="field-label">Minutes</label><input id="task-duration" name="durationMinutes" type="number" [(ngModel)]="draft.durationMinutes" required min="5" max="600" class="glass-input w-full rounded-xl px-2 py-2.5 text-sm" /></div>
-      </div>
-      <p class="-mt-2 text-xs text-slate-500">Include travel time. The student must be on shift for all of it.</p>
-      <div class="grid grid-cols-[2fr_1fr] gap-2">
-        <div><label for="task-building" class="field-label">Building</label><input id="task-building" name="building" [(ngModel)]="draft.building" required maxlength="100" class="glass-input w-full rounded-xl px-3 py-2.5 text-sm" /></div>
-        <div><label for="task-room" class="field-label">Room</label><input id="task-room" name="room" [(ngModel)]="draft.room" required maxlength="50" class="glass-input w-full rounded-xl px-3 py-2.5 text-sm" /></div>
-      </div>
-      <fieldset class="space-y-2 rounded-2xl border border-white/70 bg-white/40 p-3">
-        <legend class="px-1 text-sm font-medium text-slate-700">Employee</legend>
-        <input name="employeeName" [(ngModel)]="draft.employeeName" required maxlength="200" placeholder="Name" aria-label="Employee name" class="glass-input w-full rounded-xl px-3 py-2 text-sm" />
-        <div class="grid grid-cols-2 gap-2">
-          <input name="employeeEmail" type="email" email [(ngModel)]="draft.employeeEmail" maxlength="255" placeholder="Email" aria-label="Employee email" class="glass-input w-full rounded-xl px-3 py-2 text-sm" />
-          <input name="employeePhone" [(ngModel)]="draft.employeePhone" maxlength="50" placeholder="Phone" aria-label="Employee phone" class="glass-input w-full rounded-xl px-3 py-2 text-sm" />
-        </div>
-        <input name="employeeDepartment" [(ngModel)]="draft.employeeDepartment" maxlength="100" placeholder="Department" aria-label="Employee department" class="glass-input w-full rounded-xl px-3 py-2 text-sm" />
-      </fieldset>
-      <div>
-        <label for="task-description" class="field-label">Details <span class="font-normal text-slate-500">(optional)</span></label>
-        <textarea id="task-description" name="description" [(ngModel)]="draft.description" maxlength="2000" rows="3" class="glass-input w-full rounded-xl px-3 py-2 text-sm"></textarea>
-      </div>
-      <fieldset>
-        <legend class="field-label">Items to bring <span class="font-normal text-slate-500">{{ draft.type === 'FIX' ? '(optional)' : '' }}</span></legend>
-        <div class="space-y-2">
-          @for (line of draft.items; track $index; let i = $index) {
-            <div class="rounded-xl border border-white/70 bg-white/40 p-2">
-              <div class="flex gap-2">
-                <select [name]="'item-' + i" [(ngModel)]="line.itemId" aria-label="Item" class="glass-input min-w-0 flex-1 rounded-lg px-2 py-1.5 text-sm">
-                  @for (item of items(); track item.id) { <option [ngValue]="item.id">{{ item.name }}</option> }
-                </select>
-                <input [name]="'qty-' + i" type="number" min="1" max="1000" [(ngModel)]="line.quantity" aria-label="Quantity" class="glass-input w-16 rounded-lg px-2 py-1.5 text-sm" />
-                <button type="button" class="icon-button size-8" aria-label="Remove this item" (click)="removeItemRow(i)">✕</button>
-              </div>
-              <div class="mt-1.5 flex items-center gap-2">
-                <select [name]="'room-' + i" [(ngModel)]="line.locationId" aria-label="Take from room" class="glass-input min-w-0 flex-1 rounded-lg px-2 py-1.5 text-xs">
-                  @for (room of rooms(); track room.id) { <option [ngValue]="room.id">from {{ room.label }}</option> }
-                </select>
-                <span class="shrink-0 text-xs text-slate-500">{{ availability(line.itemId) }}</span>
-              </div>
-            </div>
-          }
-        </div>
-        @if (items().length > 0 && rooms().length > 0) {
-          <button type="button" class="mt-2 text-sm font-medium text-teal-900 hover:underline" (click)="addItemRow()">+ Add an item</button>
-        } @else {
-          <p class="mt-1 text-xs text-slate-500">Add items and storage rooms on the Inventory page to plan items here.</p>
-        }
-      </fieldset>
-      @if (formError()) { <p role="alert" class="rounded-2xl bg-rose-50/90 px-4 py-3 text-sm text-rose-900">{{ formError() }}</p> }
-      <div class="flex justify-end gap-2 pt-1">
-        <button type="button" class="btn btn-quiet" (click)="formOpen.set(false)">Cancel</button>
-        <button type="submit" class="btn submit-button text-white" [disabled]="busy()">{{ busy() ? 'Saving…' : editingId() ? 'Save changes' : 'Create and assign' }}</button>
-      </div>
-    </form>
-  }
-</app-side-panel>
+<app-task-panels (changed)="refresh($event)" />

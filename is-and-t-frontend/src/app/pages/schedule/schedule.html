@@ -46,7 +46,7 @@
               }
             </div>
             @for (task of day.tasks; track task.id) {
-              <p class="mt-1.5 text-sm text-slate-700"><span class="font-medium">{{ task.startTime }}</span> {{ task.title }} <span class="text-slate-500">· {{ task.building }} {{ task.room }}{{ task.status === 'COMPLETED' ? ' · done' : '' }}</span></p>
+              <p class="mt-1.5 text-sm text-slate-700"><span class="font-medium">{{ task.startTime }}</span> {{ task.title }} <span class="text-slate-500">· {{ task.location }}{{ task.status === 'COMPLETED' ? ' · done' : '' }}</span></p>
             }
           </li>
         }

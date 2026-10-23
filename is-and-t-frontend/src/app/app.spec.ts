@@ -20,6 +20,14 @@ const admin: User = {
 
 const student: User = { ...admin, id: 1, email: 'sam@example.com', firstName: 'Sam', role: 'STUDENT', studentId: '2001' };
 
+// The test browser (jsdom) has no <dialog> methods; side panels and dialogs call them.
+HTMLDialogElement.prototype.showModal ??= function (this: HTMLDialogElement) {
+  this.setAttribute('open', '');
+};
+HTMLDialogElement.prototype.close ??= function (this: HTMLDialogElement) {
+  this.removeAttribute('open');
+};
+
 describe('App routing', () => {
   let http: HttpTestingController;
 
@@ -57,7 +65,7 @@ describe('App routing', () => {
       date: today, holiday: null, dayOff: false, shifts: [{ start: '00:00', end: '23:59', extra: false }],
       tasks: [{
         id: 9, type: 'FIX', title: 'Printer offline', description: null, date: today, startTime: '23:30', endTime: '23:59', durationMinutes: 29,
-        building: 'BU', room: '201', employee: { name: 'Pat', email: null, phone: null, department: null }, status: 'ASSIGNED',
+        location: 'BU 201', employee: { name: 'Pat', email: null, phone: null }, supplies: [], status: 'ASSIGNED',
         assignee: { id: 1, name: 'Sam Admin' }, claimedOffShift: false, outcomeNotes: null, finishedAt: null, parentTaskId: null, items: [],
       }],
       upForGrabsToday: 2, weekHours: 12, weeklyHourLimit: 20, semesterName: 'Fall 2026', request: null,
@@ -121,36 +129,6 @@ describe('App routing', () => {
     expect(row.textContent).toContain('Low (≤ 5)');
   });
 
-  it('shows each student’s shifts in the team week, with extra shifts, days off and hours over the limit', async () => {
-    await logInAs(admin);
-    const harness = await RouterTestingHarness.create('/admin/schedules');
-    const days = ['2026-10-19', '2026-10-20', '2026-10-21', '2026-10-22', '2026-10-23'];
-    http.expectOne('/api/admin/schedule/week').flush({
-      start: '2026-10-19', weeklyHourLimit: 20, semesterName: 'Fall 2026',
-      days: days.map((date) => ({ date, holiday: date === '2026-10-23' ? 'Fall Break' : null })),
-      students: [{
-        studentId: 1, name: 'Sam Student', hours: 22, overLimit: true,
-        days: days.map((date) => ({
-          date, cancelled: date === '2026-10-20', timeOff: date === '2026-10-22' ? [{ start: '10:00', end: '11:00' }] : [],
-          shifts: date === '2026-10-19' ? [{ start: '09:00', end: '13:00', extra: false }, { start: '15:00', end: '17:00', extra: true }] : [],
-        })),
-      }],
-    });
-    http.expectOne('/api/admin/schedule/requests').flush([]);
-    http.expectOne('/api/admin/semesters').flush([]);
-    http.expectOne('/api/admin/time-off').flush([]);
-    await harness.fixture.whenStable();
-    harness.detectChanges();
-    const text = harness.routeNativeElement!.textContent!;
-
-    expect(text).toContain('09:00–13:00');
-    expect(text).toContain('15:00–17:00');
-    expect(text).toContain('Day off');
-    expect(text).toContain('Fall Break');
-    expect(text).toContain('Off 10:00–11:00');
-    expect(harness.routeNativeElement!.querySelector('td.text-rose-800')?.textContent).toContain('22');
-  });
-
   it('lets a student enter class times and preferred hours for a semester', async () => {
     await logInAs(student);
     const harness = await RouterTestingHarness.create('/schedule');
@@ -185,7 +163,7 @@ describe('App routing', () => {
     const harness = await RouterTestingHarness.create('/tasks');
     const task = {
       id: 9, type: 'DEPLOYMENT', title: 'New hire setup', description: null, date: '2026-10-21', startTime: '10:00', endTime: '10:30',
-      durationMinutes: 30, building: 'RT', room: '1408', employee: { name: 'Pat Employee', email: null, phone: '216-555-0100', department: 'HR' },
+      durationMinutes: 30, location: 'RT 1408', employee: { name: 'Pat Employee', email: null, phone: '216-555-0100' }, supplies: [{ name: 'Webcam', quantity: 1 }],
       status: 'ASSIGNED', assignee: { id: 1, name: 'Sam Admin' }, claimedOffShift: false, outcomeNotes: null, finishedAt: null, parentTaskId: null,
       items: [{ id: 3, itemId: 1, itemName: 'Dell P2422H', locationId: 1, locationLabel: 'RT 1408', quantityPlanned: 2, quantityUsed: null, status: 'RESERVED' }],
     };
@@ -211,24 +189,73 @@ describe('App routing', () => {
     expect(text).toContain('Claim this task');
   });
 
-  it('shows the week of tasks on the admin board, unassigned ones highlighted', async () => {
+  /** Opens the Planner with one student's week and two tasks (one theirs, one unassigned). */
+  async function openPlanner(): Promise<RouterTestingHarness> {
     await logInAs(admin);
-    const harness = await RouterTestingHarness.create('/admin/tasks');
-    const monday = (() => { const d = new Date(); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.toLocaleDateString('en-CA'); })();
-    http.expectOne((request) => request.url === '/api/admin/tasks').flush([{
-      id: 9, type: 'FIX', title: 'Printer offline', description: null, date: monday, startTime: '11:00', endTime: '11:30', durationMinutes: 30,
-      building: 'BU', room: '201', employee: { name: 'Pat', email: null, phone: null, department: null }, status: 'UNASSIGNED', assignee: null,
+    const harness = await RouterTestingHarness.create('/admin/planner');
+    const days = ['2026-10-19', '2026-10-20', '2026-10-21', '2026-10-22', '2026-10-23'];
+    const task = (id: number, title: string, status: string, assignee: { id: number; name: string } | null) => ({
+      id, type: 'FIX', title, description: null, date: days[0], startTime: '11:00', endTime: '11:30', durationMinutes: 30,
+      location: 'BU 201', employee: { name: 'Pat', email: null, phone: null }, supplies: [], status, assignee,
       claimedOffShift: false, outcomeNotes: null, finishedAt: null, parentTaskId: null, items: [],
-    }]);
-    await new Promise((resolve) => setTimeout(resolve)); // the tasks load first, then the settings
-    http.expectOne('/api/admin/settings').flush({ digestTime: '08:00', defaultTaskDuration: 45, admins: [] });
+    });
+    http.expectOne((request) => request.url === '/api/admin/schedule/week').flush({
+      start: days[0], weeklyHourLimit: 20, semesterName: 'Fall 2026',
+      days: days.map((date) => ({ date, holiday: date === '2026-10-23' ? 'Fall Break' : null })),
+      students: [{
+        studentId: 1, name: 'Sam Student', hours: 22, overLimit: true,
+        days: days.map((date) => ({
+          date, cancelled: date === '2026-10-20', timeOff: date === '2026-10-22' ? [{ start: '10:00', end: '11:00' }] : [],
+          shifts: date === days[0] ? [{ start: '09:00', end: '13:00', extra: false }, { start: '15:00', end: '17:00', extra: true }] : [],
+        })),
+      }],
+    });
+    http.expectOne((request) => request.url === '/api/admin/tasks').flush([
+      task(9, 'Printer offline', 'UNASSIGNED', null),
+      task(10, 'Dock setup', 'ASSIGNED', { id: 1, name: 'Sam Student' }),
+    ]);
     await new Promise((resolve) => setTimeout(resolve));
     await harness.fixture.whenStable();
     harness.detectChanges();
-    const text = harness.routeNativeElement!.textContent!;
+    return harness;
+  }
 
-    expect(text).toContain('Printer offline');
-    expect(text).toContain('1 unassigned');
+  it('shows everyone’s shifts and tasks for the week on the Planner', async () => {
+    const harness = await openPlanner();
+    const page = harness.routeNativeElement!;
+    const text = page.textContent!;
+
+    expect(text).toContain('09:00–13:00');
+    expect(text).toContain('15:00–17:00');
+    expect(text).toContain('Day off');
+    expect(text).toContain('Fall Break');
+    expect(text).toContain('Off 10:00–11:00');
+    expect(text).toContain('1 task needs someone');
+    expect(page.querySelector('th span.text-rose-800')?.textContent).toContain('22');
+    // The unassigned task is in the Unassigned row, Sam's task in Sam's row
+    const rows = page.querySelectorAll('tbody tr');
+    expect(rows[0].textContent).toContain('Printer offline');
+    expect(rows[1].textContent).toContain('Dock setup');
+  });
+
+  it('opens a student’s weekly shift editor from the Schedule button next to their name', async () => {
+    const harness = await openPlanner();
+    harness.routeNativeElement!.querySelector<HTMLButtonElement>('button[aria-label="Edit Sam Student’s schedule"]')!.click();
+    const semester = { id: 3, name: 'Fall 2026', startDate: '2026-08-24', endDate: '2026-12-12', weeklyHourLimit: 20, current: true };
+    await new Promise((resolve) => setTimeout(resolve));
+    http.expectOne('/api/admin/semesters').flush([semester]);
+    await new Promise((resolve) => setTimeout(resolve));
+    http.expectOne((request) => request.url === '/api/admin/schedule/students/1').flush({
+      studentId: 1, studentName: 'Sam Student', semester, classes: [], preferred: [],
+      shifts: [{ day: 'MONDAY', start: '09:00', end: '13:00' }], weeklyHours: 4, request: null, exceptions: [],
+    });
+    await new Promise((resolve) => setTimeout(resolve));
+    await harness.fixture.whenStable();
+    harness.detectChanges();
+    const panel = harness.fixture.nativeElement as HTMLElement;
+
+    expect(panel.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toContain('Calendar');
+    expect(panel.querySelectorAll('[data-shift]').length).toBe(1);
   });
 
   it('lets a student ask for time off for one of that day’s shifts', async () => {
@@ -365,6 +392,61 @@ describe('App routing', () => {
     await expect(login).rejects.toBeTruthy();
     expect(auth.isLoggedIn()).toBe(false);
     expect(page).toBeTruthy();
+  });
+
+  it('creates a task with just a title and location, picking and typing things to bring, left unassigned', async () => {
+    await logInAs(admin);
+    const harness = await RouterTestingHarness.create('/admin/tasks');
+    http.expectOne((request) => request.url === '/api/admin/tasks').flush([]);
+    await harness.fixture.whenStable();
+    const page = harness.fixture.nativeElement as HTMLElement;
+    const settle = async () => {
+      await new Promise((resolve) => setTimeout(resolve));
+      await harness.fixture.whenStable();
+      harness.detectChanges();
+    };
+    const button = (text: string) => [...page.querySelectorAll('button')].find((b) => b.textContent?.trim().startsWith(text))!;
+    const type = async (input: HTMLInputElement, value: string) => {
+      input.value = value;
+      input.dispatchEvent(new Event('input'));
+      await settle();
+    };
+
+    button('+ New task').click();
+    await settle();
+    http.expectOne('/api/admin/settings').flush({ digestTime: '08:00', defaultTaskDuration: 30, admins: [] });
+    await settle();
+    http.expectOne('/api/admin/inventory/items').flush([]); // no inventory at all: still fine
+    http.expectOne('/api/admin/inventory/locations').flush([]);
+    http.expectOne('/api/admin/students').flush([student]);
+    await settle();
+    await settle();
+
+    await type(page.querySelector<HTMLInputElement>('#task-title')!, 'New hire setup');
+    await type(page.querySelector<HTMLInputElement>('#task-location')!, 'Rhodes Tower 1408');
+    button('Dual Monitors').click(); // the plain one, listed first
+    button('Dual Monitors').click();
+    button('Webcam').click();
+    await settle();
+    button('+ Type something else').click();
+    await settle();
+    await type(page.querySelectorAll<HTMLInputElement>('input[aria-label="Thing to bring"]')[2], 'Docking station');
+    expect(page.textContent).not.toContain('Department');
+
+    // "Who does it": leave it unassigned
+    const who = page.querySelector<HTMLSelectElement>('#task-who')!;
+    expect([...who.options].map((o) => o.textContent?.trim())).toContain('Sam Admin');
+    who.value = 'none';
+    who.dispatchEvent(new Event('change'));
+    await settle();
+
+    button('Create task').click();
+    await settle();
+    const request = http.expectOne((r) => r.method === 'POST' && r.url === '/api/admin/tasks');
+    expect(request.request.body).toEqual(expect.objectContaining({
+      title: 'New hire setup', location: 'Rhodes Tower 1408', employeeName: '', items: [], autoAssign: false,
+      supplies: [{ name: 'Dual Monitors', quantity: 2 }, { name: 'Webcam', quantity: 1 }, { name: 'Docking station', quantity: 1 }],
+    }));
   });
 
   it('has no self-registration page', async () => {

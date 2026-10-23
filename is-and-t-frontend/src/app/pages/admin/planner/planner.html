@@ -1,0 +1,146 @@
+<div class="flex flex-wrap items-end justify-between gap-4">
+  <div>
+    <h1 class="text-3xl font-semibold tracking-tight text-slate-900">Planner</h1>
+    <p class="mt-1 text-sm text-slate-600">Everyone’s shifts and tasks for the week. ✎ changes someone’s weekly shifts; + adds a task for that person and day.</p>
+  </div>
+  <button type="button" class="btn submit-button text-white" (click)="addTask(focusedDay() ?? (isThisWeek() ? today : weekStart()))"><span aria-hidden="true">+</span> New task</button>
+</div>
+
+<!-- The week: title, arrows, today, month view -->
+<div class="glass-panel relative z-20 mt-6 flex flex-wrap items-center justify-between gap-3 rounded-3xl px-4 py-3 sm:px-5">
+  <div>
+    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-teal-800">{{ isThisWeek() ? 'This week' : 'Week of' }}</p>
+    <p class="text-xl font-semibold tracking-tight text-slate-900">{{ title() }}</p>
+    <p class="text-sm text-slate-500">
+      @if (week(); as w) {
+        {{ w.semesterName ? w.semesterName + ' · limit ' + w.weeklyHourLimit + ' h a week' : 'Not in a semester: only extra shifts apply' }}
+      }
+    </p>
+  </div>
+  <div #monthArea class="relative flex items-center gap-1">
+    <button type="button" class="btn btn-quiet px-3 py-2" aria-label="Previous week" title="Previous week" (click)="moveWeek(-1)">←</button>
+    <button type="button" class="btn btn-quiet px-3 py-2" [disabled]="isThisWeek() && !focusedDay()" (click)="moveWeek(0)">Today</button>
+    <button type="button" class="btn btn-quiet px-3 py-2" aria-label="Next week" title="Next week" (click)="moveWeek(1)">→</button>
+    <button type="button" class="btn btn-quiet px-3 py-2" aria-controls="month-view" [attr.aria-expanded]="monthOpen()" (click)="monthOpen.set(!monthOpen())">
+      <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" /></svg>
+      Month
+    </button>
+    @if (monthOpen()) {
+      <div id="month-view" class="glass-menu absolute right-0 top-full z-40 mt-2 w-[min(26rem,calc(100vw-2rem))] rounded-3xl p-4">
+        <app-month-picker [selectedWeek]="weekStart()" [today]="today" [counts]="monthCounts()" (pick)="pickFromMonth($event)" (monthShown)="loadMonth($event)" />
+      </div>
+    }
+  </div>
+</div>
+
+<section class="glass-panel mt-4 rounded-3xl p-2 sm:p-4">
+  @if (loading()) {
+    <p class="py-12 text-center text-sm text-slate-500">Loading…</p>
+  } @else if (week(); as w) {
+    <div class="overflow-x-auto">
+      <table class="w-full min-w-[56rem] table-fixed border-separate border-spacing-1 text-left text-sm">
+        <thead>
+          <tr>
+            <th scope="col" class="w-44 px-2 py-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Student</th>
+            @for (day of w.days; track day.date) {
+              <th scope="col" class="rounded-xl px-2 py-2 align-top" [class.bg-teal-100]="highlighted(day.date)">
+                <span class="block text-xs font-semibold uppercase tracking-wider" [class.text-teal-900]="highlighted(day.date)" [class.text-slate-500]="!highlighted(day.date)">{{ day.date | date: 'EEE' }}</span>
+                <span class="block text-lg font-semibold leading-tight text-slate-900">{{ day.date | date: 'MMM d' }}</span>
+                @if (day.date === today) { <span class="badge badge-solid mt-1">Today</span> }
+                @if (day.holiday) { <span class="badge mt-1 block w-fit bg-rose-100 text-rose-900" [title]="day.holiday">{{ day.holiday }}</span> }
+              </th>
+            }
+          </tr>
+        </thead>
+        <tbody>
+          <!-- Tasks nobody has yet -->
+          <tr>
+            <th scope="row" class="rounded-xl bg-amber-50/70 px-3 py-2.5 align-top">
+              <span class="block font-semibold text-amber-950">Unassigned</span>
+              <span class="block text-xs text-amber-800">{{ unassigned().length }} {{ unassigned().length === 1 ? 'task needs' : 'tasks need' }} someone</span>
+            </th>
+            @for (day of w.days; track day.date) {
+              <td class="group rounded-xl bg-amber-50/40 p-1.5 align-top" [class.ring-2]="highlighted(day.date)" [class.ring-teal-300]="highlighted(day.date)">
+                <div class="flex min-h-14 flex-col gap-1">
+                  @for (task of unassignedOn(day.date); track task.id) {
+                    <ng-container *ngTemplateOutlet="taskCard; context: { $implicit: task }" />
+                  }
+                  <button type="button" class="icon-button mt-auto size-7 self-end opacity-0 group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100"
+                    [attr.aria-label]="'New task on ' + (day.date | date: 'EEEE MMM d')" title="New task (assigned automatically)" (click)="addTask(day.date)">+</button>
+                </div>
+              </td>
+            }
+          </tr>
+
+          @if (w.students.length === 0) {
+            <tr><td colspan="6" class="py-12 text-center text-sm text-slate-600">No active students yet. Add them on the Users page.</td></tr>
+          }
+
+          @for (student of w.students; track student.studentId) {
+            <tr>
+              <th scope="row" class="rounded-xl bg-white/40 px-3 py-2.5 align-top">
+                <span class="block truncate font-semibold text-slate-900">{{ student.name }}</span>
+                <span class="block text-xs" [class.text-rose-800]="student.overLimit" [class.font-semibold]="student.overLimit" [class.text-slate-500]="!student.overLimit">
+                  {{ student.hours }}@if (w.weeklyHourLimit) { / {{ w.weeklyHourLimit }} } h this week
+                </span>
+                <button type="button" class="btn btn-quiet mt-2 px-2.5 py-1 text-xs" [attr.aria-label]="'Edit ' + student.name + '’s schedule'" (click)="editSchedule(student)">
+                  <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></svg>
+                  Schedule
+                </button>
+              </th>
+              @for (day of w.days; track day.date) {
+                <td class="group rounded-xl bg-white/25 p-1.5 align-top" [class.ring-2]="highlighted(day.date)" [class.ring-teal-300]="highlighted(day.date)">
+                  @if (dayOf(student, day.date); as cell) {
+                    <div class="flex min-h-14 flex-col gap-1">
+                      @if (cell.cancelled) { <span class="badge w-fit bg-slate-200 text-slate-600">Day off</span> }
+                      @for (off of cell.timeOff; track off.start) { <span class="badge w-fit bg-slate-200 text-slate-600">Off {{ off.start }}–{{ off.end }}</span> }
+                      @for (shift of cell.shifts; track shift.start) {
+                        <span class="w-fit rounded-lg px-2 py-0.5 text-xs font-semibold" [class]="shift.extra ? 'border border-dashed border-teal-600 text-teal-900' : 'shift-block text-white'"
+                          [title]="shift.extra ? 'Extra shift, this day only' : 'Weekly shift'">{{ shift.start }}–{{ shift.end }}</span>
+                      }
+                      @for (task of tasksOf(student, day.date); track task.id) {
+                        <ng-container *ngTemplateOutlet="taskCard; context: { $implicit: task }" />
+                      }
+                      <button type="button" class="icon-button mt-auto size-7 self-end opacity-0 group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100"
+                        [attr.aria-label]="'New task for ' + student.name + ' on ' + (day.date | date: 'EEEE MMM d')" title="New task for {{ student.name }}" (click)="addTask(day.date, student)">+</button>
+                    </div>
+                  }
+                </td>
+              }
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    @if (weekendTasks().length > 0) {
+      <h2 class="mt-5 px-2 text-xs font-semibold uppercase tracking-widest text-slate-500">Weekend</h2>
+      <div class="mt-2 grid gap-2 px-2 sm:grid-cols-3">
+        @for (task of weekendTasks(); track task.id) { <ng-container *ngTemplateOutlet="taskCard; context: { $implicit: task }" /> }
+      </div>
+    }
+
+    <p class="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 px-2 text-xs text-slate-500">
+      <span class="flex items-center gap-1.5"><span class="shift-block inline-block h-3 w-5 rounded"></span> Weekly shift</span>
+      <span class="flex items-center gap-1.5"><span class="inline-block h-3 w-5 rounded border border-dashed border-teal-600"></span> Extra shift (that day only)</span>
+      <span class="flex items-center gap-1.5"><span class="inline-block h-3 w-5 rounded border border-white bg-white/80"></span> Task</span>
+      <span class="flex items-center gap-1.5"><span class="inline-block h-3 w-5 rounded border border-amber-300 bg-amber-50"></span> Unassigned task</span>
+      <span class="text-rose-800">Red hours: over the weekly limit</span>
+    </p>
+  }
+</section>
+
+<ng-template #taskCard let-task>
+  <button type="button" class="block w-full rounded-xl border px-2 py-1.5 text-left text-xs"
+    [class]="task.status === 'UNASSIGNED' ? 'border-amber-300 bg-amber-50/90' : task.status === 'ASSIGNED' ? 'border-white/80 bg-white/75' : task.status === 'COMPLETED' ? 'border-teal-200 bg-teal-50/80' : 'border-slate-200 bg-slate-100/70 opacity-70'"
+    [attr.data-task]="task.id" [class.task-highlight]="highlight() === task.id"
+    [attr.aria-label]="task.title + ', ' + task.startTime + ' to ' + task.endTime + ', ' + label(task.status) + (task.assignee ? ', ' + task.assignee.name : '')"
+    (click)="openTask(task)">
+    <span class="block font-semibold text-slate-500">{{ task.startTime }}–{{ task.endTime }}</span>
+    <span class="block truncate font-medium text-slate-900">{{ task.title }}</span>
+    <span class="block truncate text-slate-500">{{ task.location }}@if (task.status === 'COMPLETED') { · Done }@if (task.claimedOffShift) { · ⚠ }</span>
+  </button>
+</ng-template>
+
+<app-student-schedule-panel (changed)="refresh()" />
+<app-task-panels (changed)="refresh($event)" />
