@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -153,15 +154,22 @@ public class AdminTaskService {
 		return workflow.describe(task);
 	}
 
-	/** Everyone who could be given the task; eligible ones (on shift and free) first. */
+	/** Every active student for an existing task; available ones (on shift and free) first. */
 	@Transactional(readOnly = true)
 	public List<Candidate> candidates(Long id) {
 		Task task = find(id);
-		Set<Long> eligible = assigner.eligible(task, Set.of()).stream().map(Student::getId).collect(Collectors.toSet());
-		return students.findAllByOrderByLastNameAscFirstNameAsc().stream()
-				.filter(s -> s.isActive() && s.getPasswordHash() != null)
-				.map(s -> new Candidate(s.getId(), TaskWorkflow.name(s), eligible.contains(s.getId())))
-				.sorted(Comparator.comparing(Candidate::eligible).reversed())
+		return availability(task.date(zone), task.startTime(zone), task.endTime(zone), task.getId());
+	}
+
+	/** The same, for a task being written (not saved yet): who'd be free at this time. */
+	@Transactional(readOnly = true)
+	public List<Candidate> availability(LocalDate date, LocalTime start, int minutes, Long ignoreTaskId) {
+		return availability(date, start, start.plusMinutes(minutes), ignoreTaskId);
+	}
+
+	private List<Candidate> availability(LocalDate date, LocalTime start, LocalTime end, Long ignoreTaskId) {
+		return assigner.availability(date, start, end, ignoreTaskId).stream()
+				.map(a -> new Candidate(a.student().getId(), TaskWorkflow.name(a.student()), a.problem() == null, a.problem()))
 				.toList();
 	}
 

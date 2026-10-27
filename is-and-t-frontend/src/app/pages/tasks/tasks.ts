@@ -6,6 +6,7 @@ import { MyTaskApi, MyTasks, Task } from '../../services/tasks';
 import { Confirm } from '../../ui/confirm';
 import { SidePanel } from '../../ui/side-panel';
 import { Toasts } from '../../ui/toast';
+import { remembered } from '../../services/remember';
 
 /**
  * User portal: Tasks (/tasks). The student's upcoming tasks with complete / couldn't complete /
@@ -25,7 +26,7 @@ export class Tasks implements OnInit {
   protected readonly busyId = signal<number | null>(null);
   /** Task ids whose details are expanded. */
   protected readonly expanded = signal(new Set<number>());
-  protected readonly onlyMyShifts = signal(true);
+  protected readonly onlyMyShifts = remembered('tasks.onlyMyShifts', true);
   protected readonly today = new Date().toLocaleDateString('en-CA');
 
   /** Your tasks under "Today", "Tomorrow" and one heading per later day. */

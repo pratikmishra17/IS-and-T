@@ -6,6 +6,7 @@ import { errorMessage } from '../../../services/errors';
 import { Confirm } from '../../../ui/confirm';
 import { SidePanel } from '../../../ui/side-panel';
 import { Toasts } from '../../../ui/toast';
+import { remembered } from '../../../services/remember';
 
 /** Consecutive days with the same name, shown as one row (Spring Break, Mar 15 – 19). */
 interface HolidayGroup {
@@ -30,7 +31,7 @@ export class AdminCalendar implements OnInit {
   protected readonly semesters = signal<Semester[]>([]);
   protected readonly holidays = signal<Holiday[]>([]);
   protected readonly loading = signal(true);
-  protected readonly showPastHolidays = signal(false);
+  protected readonly showPastHolidays = remembered('calendar.pastHolidays', false);
   protected readonly today = new Date().toLocaleDateString('en-CA'); // "2026-10-21", comparable with API dates
 
   protected readonly holidayGroups = computed(() => {

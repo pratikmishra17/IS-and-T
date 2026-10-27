@@ -75,6 +75,43 @@ class TaskAssigner {
 		return candidates;
 	}
 
+	/** One student's availability for a time: problem is null when they're free and on shift. */
+	record Availability(Student student, String problem) {
+	}
+
+	/**
+	 * Every active student, with why they couldn't take a task at this time, if they couldn't:
+	 * hasn't set a password (can't log in yet), not working that day, not on shift for the whole
+	 * time, or busy with another task. Available students first, then by name. The admin may still
+	 * pick anyone; this only says who'd be a good choice.
+	 */
+	List<Availability> availability(LocalDate date, LocalTime start, LocalTime end, Long ignoreTaskId) {
+		List<Student> pool = students.findAllByOrderByLastNameAscFirstNameAsc().stream().filter(Student::isActive).toList();
+		Map<Long, Map<LocalDate, ShiftCalendar.Day>> days = shifts.between(pool.stream().map(Student::getId).toList(), date, date);
+		Set<Long> busy = tasks.findStartingBetween(date.atStartOfDay(zone).toInstant(), date.plusDays(1).atStartOfDay(zone).toInstant()).stream()
+				.filter(other -> !other.getId().equals(ignoreTaskId) && other.getStatus() == TaskStatus.ASSIGNED && other.getAssignee() != null)
+				.filter(other -> other.startTime(zone).isBefore(end) && start.isBefore(other.endTime(zone)))
+				.map(other -> other.getAssignee().getId()).collect(Collectors.toSet());
+		List<Availability> all = pool.stream().map(student -> {
+			ShiftCalendar.Day day = days.get(student.getId()).get(date);
+			String problem = null;
+			if (student.getPasswordHash() == null) {
+				problem = "hasn't set a password yet";
+			}
+			else if (day.shifts().isEmpty()) {
+				problem = "not working that day";
+			}
+			else if (day.shifts().stream().noneMatch(shift -> !shift.start().isAfter(start) && !shift.end().isBefore(end))) {
+				problem = "not on shift for the whole time";
+			}
+			else if (busy.contains(student.getId())) {
+				problem = "has another task then";
+			}
+			return new Availability(student, problem);
+		}).toList();
+		return all.stream().sorted(Comparator.comparing((Availability a) -> a.problem() != null)).toList();
+	}
+
 	boolean isOnShiftForWholeTask(Student student, Task task) {
 		return task.endsSameDay(zone) && coversTask(shifts.on(student.getId(), task.date(zone)), task);
 	}

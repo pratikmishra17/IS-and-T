@@ -39,7 +39,7 @@
   <section class="glass-panel rounded-3xl p-5 lg:col-span-2" aria-labelledby="attention-title">
     <h2 id="attention-title" class="font-semibold text-slate-900">Needs attention</h2>
     @if (timeOffPending() > 0) {
-      <a routerLink="/admin/schedules" class="mt-3 flex items-center justify-between rounded-2xl bg-amber-50/80 px-4 py-3 text-sm font-medium text-amber-950 hover:bg-amber-100/80">
+      <a routerLink="/admin/planner" [queryParams]="{ view: 'timeoff' }" class="mt-3 flex items-center justify-between rounded-2xl bg-amber-50/80 px-4 py-3 text-sm font-medium text-amber-950 hover:bg-amber-100/80">
         {{ timeOffPending() }} time-off request{{ timeOffPending() === 1 ? '' : 's' }} to review <span aria-hidden="true">→</span>
       </a>
     }

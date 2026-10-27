@@ -13,6 +13,8 @@ class Host {
 }
 
 describe('ShiftWeekEditor', () => {
+  beforeEach(() => localStorage.clear()); // the editor remembers its last tab
+
   function setUp(shifts: TimeBlock[] = []) {
     const fixture = TestBed.createComponent(Host);
     fixture.componentInstance.shifts.set(shifts);

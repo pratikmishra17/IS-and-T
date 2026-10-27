@@ -10,6 +10,7 @@ import { Confirm } from '../../ui/confirm';
 import { Toasts } from '../../ui/toast';
 import { MyScheduleApi, StudentSchedule, TimeBlock, WEEKDAYS, dayName, totalHours } from '../../services/schedule';
 import { TimeBlocksEditor } from '../../ui/time-blocks-editor';
+import { remembered } from '../../services/remember';
 
 /**
  * User portal: My schedule (/schedule). The student enters class times and the hours they'd like
@@ -27,7 +28,7 @@ export class Schedule implements OnInit {
   private readonly confirm = inject(Confirm);
   private readonly toasts = inject(Toasts);
 
-  protected readonly tab = signal<'week' | 'hours' | 'timeoff'>('week');
+  protected readonly tab = remembered<'week' | 'hours' | 'timeoff'>('schedule.tab', 'week', { allowed: ['week', 'hours', 'timeoff'] });
 
   // Time off
   protected readonly myTimeOff = signal<TimeOff[]>([]);

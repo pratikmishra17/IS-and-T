@@ -79,6 +79,18 @@ class TaskAssignerTest {
 		assertThat(assigner.eligible(task(11L, "09:30", 30), Set.of(1L, 2L))).containsExactly(cat);
 	}
 
+	@Test
+	void availabilityListsEveryoneWithWhyTheyCantTakeItAndAvailableFirst() {
+		Task bensTask = task(10L, "10:00", 60);
+		bensTask.assignTo(ben, false);
+		when(tasks.findStartingBetween(any(), any())).thenReturn(List.of(bensTask));
+
+		List<TaskAssigner.Availability> all = assigner.availability(MONDAY, LocalTime.of(10, 30), LocalTime.of(11, 0), null);
+
+		assertThat(all).extracting(a -> a.student().getFirstName() + ": " + a.problem()).containsExactly(
+				"Ann: null", "Ben: has another task then", "Cat: not on shift for the whole time");
+	}
+
 	private static Task task(Long id, String start, int minutes) {
 		Task task = new Task(new TaskRequest(TaskType.FIX, "Fix printer", null, MONDAY, LocalTime.parse(start), minutes,
 				"RT 1408", "Pat Employee", null, null, List.of(), List.of(), null, null), CLEVELAND, null);

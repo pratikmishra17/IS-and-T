@@ -57,8 +57,11 @@ public final class TaskResponses {
 	public record TaskDetail(TaskResponse task, List<EventResponse> history) {
 	}
 
-	/** Someone a task could go to. eligible = on shift for the whole task and free at that time. */
-	public record Candidate(Long id, String name, boolean eligible) {
+	/**
+	 * Someone a task could go to. eligible = on shift for the whole task and free at that time;
+	 * otherwise note says why not ("not on shift for the whole time"). Anyone can still be chosen.
+	 */
+	public record Candidate(Long id, String name, boolean eligible, String note) {
 	}
 
 	/**

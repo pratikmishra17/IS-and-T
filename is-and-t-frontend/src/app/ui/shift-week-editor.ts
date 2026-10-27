@@ -1,6 +1,7 @@
 import { NgTemplateOutlet } from '@angular/common';
 import { Component, ElementRef, computed, effect, input, model, signal, viewChild } from '@angular/core';
 import { Day, TimeBlock, WEEKDAYS, addOnDays, clock, dayName, mergeShifts, minutes, overlaps, totalHours } from '../services/schedule';
+import { remembered } from '../services/remember';
 
 /** Each row of the grid is half an hour; dragging snaps to it. */
 const SLOT = 30;
@@ -193,7 +194,7 @@ export class ShiftWeekEditor {
   protected readonly time = clock;
 
   /** Which tab: paint on the calendar, or type. */
-  protected readonly mode = signal<'calendar' | 'type'>('calendar');
+  protected readonly mode = remembered<'calendar' | 'type'>('shifts.mode', 'calendar', { allowed: ['calendar', 'type'] });
   /**
    * What's selected, remembered as moments ("Monday at 9:00") rather than list positions: a shift
    * is selected if it contains one. That way the selection survives merging, moving and re-sorting.

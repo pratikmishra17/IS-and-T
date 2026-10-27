@@ -6,6 +6,7 @@ import { AdjustmentType, Category, InventoryApi, Item, ItemDetails, LocationDeta
 import { Confirm } from '../../../ui/confirm';
 import { SidePanel } from '../../../ui/side-panel';
 import { Toasts } from '../../../ui/toast';
+import { remembered } from '../../../services/remember';
 
 type Tab = 'items' | 'rooms' | 'categories' | 'history';
 
@@ -26,7 +27,7 @@ export class AdminInventory implements OnInit {
   private readonly confirm = inject(Confirm);
   private readonly toasts = inject(Toasts);
 
-  protected readonly tab = signal<Tab>('items');
+  protected readonly tab = remembered<Tab>('inventory.tab', 'items', { allowed: ['items', 'rooms', 'categories', 'history'] });
   protected readonly loading = signal(true);
   protected readonly items = signal<Item[]>([]);
   protected readonly categories = signal<Category[]>([]);
@@ -34,8 +35,8 @@ export class AdminInventory implements OnInit {
   protected readonly history = signal<Transaction[]>([]);
 
   // Items tab filters
-  protected readonly search = signal('');
-  protected readonly categoryFilter = signal<number | 'all'>('all');
+  protected readonly search = remembered('inventory.search', '', { session: true });
+  protected readonly categoryFilter = remembered<number | 'all'>('inventory.category', 'all');
   protected readonly lowStockOnly = signal(false);
   protected readonly showArchived = signal(false);
 
@@ -82,6 +83,9 @@ export class AdminInventory implements OnInit {
   async ngOnInit(): Promise<void> {
     try {
       await this.reloadAll();
+      if (this.tab() === 'history') {
+        this.history.set(await this.api.transactions()); // the remembered tab needs its data too
+      }
     } catch (error) {
       this.toasts.error(errorMessage(error));
     } finally {

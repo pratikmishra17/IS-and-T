@@ -1,8 +1,6 @@
 import { DatePipe } from '@angular/common';
 import { Component, inject, output, signal } from '@angular/core';
 import { FormsModule, NgForm } from '@angular/forms';
-import { Accounts } from '../services/accounts';
-import { User } from '../services/auth';
 import { errorMessage } from '../services/errors';
 import { InventoryApi, Item, StorageLocation } from '../services/inventory';
 import { SettingsApi } from '../services/settings';
@@ -13,10 +11,20 @@ import { Toasts } from './toast';
 
 /**
  * A task's side panels: its details (history, reassign, cancel) and the new/edit/follow-up form.
- * Used by the Planner and the Tasks page: open(task), openNew(date?, student?, time?),
+ * Used by the Planner: open(task), openNew({ date, student, startTime, minutes, unassigned }),
  * openEdit(task), openFollowUp(task). (changed) fires after anything is saved, so the page can
  * reload what it shows.
  */
+/** What a new task starts with (all optional). */
+export interface NewTaskOptions {
+  date?: string;
+  student?: { id: number; name: string };
+  startTime?: string;
+  minutes?: number;
+  /** Start with "Nobody yet" instead of "Automatically". */
+  unassigned?: boolean;
+}
+
 @Component({
   selector: 'app-task-panels',
   imports: [DatePipe, FormsModule, SidePanel],
@@ -25,7 +33,6 @@ import { Toasts } from './toast';
 export class TaskPanels {
   private readonly api = inject(AdminTaskApi);
   private readonly inventory = inject(InventoryApi);
-  private readonly accounts = inject(Accounts);
   private readonly settings = inject(SettingsApi);
   private readonly confirm = inject(Confirm);
   private readonly toasts = inject(Toasts);
@@ -52,8 +59,9 @@ export class TaskPanels {
    * or a student's id (as text, like a <select> value).
    */
   protected who = 'auto';
-  /** Active students, for "Who does it". */
-  protected readonly students = signal<User[]>([]);
+  /** Every active student, free ones first, for "Who does it" at the time the form says. */
+  protected readonly available = signal<Candidate[]>([]);
+  private availabilityTimer?: ReturnType<typeof setTimeout>;
   protected readonly items = signal<Item[]>([]);
   protected readonly rooms = signal<StorageLocation[]>([]);
   protected readonly formError = signal<string | null>(null);
@@ -123,21 +131,50 @@ export class TaskPanels {
   // ---- Form ----
 
   /**
-   * A new task, optionally on a date and time, and for a particular student (preselected in
-   * "Who does it"; otherwise it's assigned automatically).
+   * A new task, optionally on a date and time (and for how long), for a particular student
+   * (preselected in "Who does it"), or left unassigned; otherwise it's assigned automatically.
    */
-  async openNew(date?: string, assignTo?: { id: number; name: string }, startTime?: string): Promise<void> {
+  async openNew(options: NewTaskOptions = {}): Promise<void> {
     await this.loadDefaults();
     this.editingId.set(null);
-    this.who = assignTo ? String(assignTo.id) : 'auto';
+    this.who = options.student ? String(options.student.id) : options.unassigned ? 'none' : 'auto';
     this.draft = this.emptyDraft();
-    if (date) {
-      this.draft.date = date;
+    if (options.date) {
+      this.draft.date = options.date;
     }
-    if (startTime) {
-      this.draft.startTime = startTime;
+    if (options.startTime) {
+      this.draft.startTime = options.startTime;
+    }
+    if (options.minutes) {
+      this.draft.durationMinutes = options.minutes;
     }
     await this.openForm();
+  }
+
+  /** Date, start or length changed: check again who'd be free then (after a short pause in typing). */
+  protected timeChanged(): void {
+    clearTimeout(this.availabilityTimer);
+    this.availabilityTimer = setTimeout(() => void this.loadAvailability(), 300);
+  }
+
+  /** The student picked in "Who does it", if they wouldn't be free then. */
+  protected unavailablePick(): Candidate | null {
+    const pick = this.available().find((c) => String(c.id) === this.who);
+    return pick && !pick.eligible ? pick : null;
+  }
+
+  protected isFree(candidates: Candidate[]): Candidate[] {
+    return candidates.filter((c) => c.eligible);
+  }
+
+  protected notFree(candidates: Candidate[]): Candidate[] {
+    return candidates.filter((c) => !c.eligible);
+  }
+
+  /** The assignee of the open task, if they're not free then. */
+  protected assigneeProblem(task: Task): Candidate | null {
+    const current = this.candidates().find((c) => c.id === task.assignee?.id);
+    return current && !current.eligible ? current : null;
   }
 
   async openEdit(task: Task): Promise<void> {
@@ -260,6 +297,14 @@ export class TaskPanels {
 
   // ---- Helpers ----
 
+  private async loadAvailability(): Promise<void> {
+    const { date, startTime, durationMinutes } = this.draft;
+    if (!date || !startTime || !(durationMinutes >= 5)) {
+      return;
+    }
+    await this.guard(async () => this.available.set(await this.api.availability(date, startTime, durationMinutes)));
+  }
+
   private async loadDefaults(): Promise<void> {
     if (this.defaultDuration === null) {
       await this.guard(async () => {
@@ -272,12 +317,12 @@ export class TaskPanels {
     this.formError.set(null);
     this.detail.set(null);
     await this.guard(async () => {
-      const [items, rooms, students] = await Promise.all([
-        this.inventory.items(), this.inventory.locations(), this.accounts.list('students'),
-      ]);
+      const [items, rooms] = await Promise.all([this.inventory.items(), this.inventory.locations()]);
       this.items.set(items.filter((item) => !item.archived));
       this.rooms.set(rooms);
-      this.students.set(students.filter((student) => student.status === 'ACTIVE'));
+      if (!this.editingId()) {
+        await this.loadAvailability();
+      }
     });
     this.formOpen.set(true);
   }

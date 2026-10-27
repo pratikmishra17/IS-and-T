@@ -33,10 +33,16 @@
           <!-- [selected] on each option (not [value] on the select), so the current student is always the one shown -->
           <select id="task-assignee" class="glass-input w-full rounded-xl px-3 py-2.5 text-sm" [disabled]="busy()" (change)="assign($any($event.target).value)">
             <option value="none" [selected]="!d.task.assignee">Unassigned</option>
-            @for (c of candidates(); track c.id) {
-              <option [value]="c.id" [selected]="c.id === d.task.assignee?.id">{{ c.name }}{{ c.eligible ? ' ✓ on shift' : ' (not on shift / busy)' }}</option>
-            }
+            <optgroup label="On shift and free">
+              @for (c of isFree(candidates()); track c.id) { <option [value]="c.id" [selected]="c.id === d.task.assignee?.id">{{ c.name }} ✓</option> }
+            </optgroup>
+            <optgroup label="Not available then (you can still choose them)">
+              @for (c of notFree(candidates()); track c.id) { <option [value]="c.id" [selected]="c.id === d.task.assignee?.id">{{ c.name }}: {{ c.note }}</option> }
+            </optgroup>
           </select>
+          @if (assigneeProblem(d.task); as problem) {
+            <p class="mt-1.5 rounded-xl bg-amber-50/90 px-3 py-2 text-xs text-amber-950">⚠ {{ problem.name }} isn’t available then: {{ problem.note }}.</p>
+          }
           @if (d.task.claimedOffShift) { <p class="mt-1 text-xs text-amber-800">⚠ Claimed while not on shift for the whole task.</p> }
         } @else {
           <p id="task-assignee" class="text-slate-900">{{ d.task.assignee?.name ?? '—' }}</p>
@@ -113,9 +119,9 @@
         <input id="task-title" name="title" [(ngModel)]="draft.title" required maxlength="200" [placeholder]="draft.type === 'DEPLOYMENT' ? 'New hire setup: laptop, 2 monitors' : 'Printer not connecting'" class="glass-input w-full rounded-xl px-3 py-2.5 text-sm" />
       </div>
       <div class="grid grid-cols-3 gap-2">
-        <div><label for="task-date" class="field-label">Date</label><input id="task-date" name="date" type="date" [(ngModel)]="draft.date" required class="glass-input w-full rounded-xl px-2 py-2.5 text-sm" /></div>
-        <div><label for="task-start" class="field-label">Start</label><input id="task-start" name="startTime" type="time" [(ngModel)]="draft.startTime" required class="glass-input w-full rounded-xl px-2 py-2.5 text-sm" /></div>
-        <div><label for="task-duration" class="field-label">Minutes</label><input id="task-duration" name="durationMinutes" type="number" [(ngModel)]="draft.durationMinutes" required min="5" max="600" class="glass-input w-full rounded-xl px-2 py-2.5 text-sm" /></div>
+        <div><label for="task-date" class="field-label">Date</label><input id="task-date" name="date" type="date" [(ngModel)]="draft.date" (ngModelChange)="timeChanged()" required class="glass-input w-full rounded-xl px-2 py-2.5 text-sm" /></div>
+        <div><label for="task-start" class="field-label">Start</label><input id="task-start" name="startTime" type="time" [(ngModel)]="draft.startTime" (ngModelChange)="timeChanged()" required class="glass-input w-full rounded-xl px-2 py-2.5 text-sm" /></div>
+        <div><label for="task-duration" class="field-label">Minutes</label><input id="task-duration" name="durationMinutes" type="number" [(ngModel)]="draft.durationMinutes" (ngModelChange)="timeChanged()" required min="5" max="600" class="glass-input w-full rounded-xl px-2 py-2.5 text-sm" /></div>
       </div>
       <p class="-mt-2 text-xs text-slate-500">Include travel time. The student must be on shift for all of it.</p>
       <div>
@@ -128,8 +134,16 @@
           <select id="task-who" name="who" [(ngModel)]="who" class="glass-input w-full rounded-xl px-3 py-2.5 text-sm">
             <option value="auto">Automatically: the least busy student on shift</option>
             <option value="none">Nobody yet (leave it unassigned)</option>
-            @for (student of students(); track student.id) { <option [value]="'' + student.id">{{ student.firstName }} {{ student.lastName }}</option> }
+            <optgroup label="On shift and free">
+              @for (c of isFree(available()); track c.id) { <option [value]="'' + c.id">{{ c.name }} ✓</option> }
+            </optgroup>
+            <optgroup label="Not available then (you can still choose them)">
+              @for (c of notFree(available()); track c.id) { <option [value]="'' + c.id">{{ c.name }}: {{ c.note }}</option> }
+            </optgroup>
           </select>
+          @if (unavailablePick(); as pick) {
+            <p class="mt-1.5 rounded-xl bg-amber-50/90 px-3 py-2 text-xs text-amber-950">⚠ {{ pick.name }} isn’t available then: {{ pick.note }}. You can still give it to them.</p>
+          }
         </div>
       }
       <fieldset class="space-y-2 rounded-2xl border border-white/70 bg-white/40 p-3">

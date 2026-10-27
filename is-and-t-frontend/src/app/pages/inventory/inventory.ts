@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { Auth } from '../../services/auth';
 import { errorMessage } from '../../services/errors';
 import { PortalApi, StockLookup } from '../../services/portal';
+import { remembered } from '../../services/remember';
 
 /** User portal: Inventory (/inventory). Read-only: find an item and see which room has it. */
 @Component({
@@ -16,8 +17,8 @@ export class Inventory implements OnInit {
 
   protected readonly items = signal<StockLookup[] | null>(null);
   protected readonly error = signal<string | null>(null);
-  protected readonly search = signal('');
-  protected readonly category = signal('all');
+  protected readonly search = remembered('stock.search', '', { session: true });
+  protected readonly category = remembered('stock.category', 'all');
 
   protected readonly categories = computed(() => [...new Set((this.items() ?? []).map((item) => item.category))].sort());
   protected readonly shown = computed(() => {

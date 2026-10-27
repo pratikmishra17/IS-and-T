@@ -1,8 +1,10 @@
 package com.isandt.backend.task;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -62,6 +64,13 @@ public class AdminTaskController {
 	@PostMapping("/{id}/cancel")
 	TaskResponse cancel(@PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser admin) {
 		return service.cancel(id, admin.getId());
+	}
+
+	/** GET /api/admin/tasks/availability?date=2026-10-27&start=10:00&minutes=30: who'd be free then, for a new task. */
+	@GetMapping("/availability")
+	List<Candidate> availability(@RequestParam LocalDate date, @RequestParam @DateTimeFormat(pattern = "HH:mm") LocalTime start,
+			@RequestParam int minutes, @RequestParam(required = false) Long ignoreTaskId) {
+		return service.availability(date, start, Math.max(5, Math.min(600, minutes)), ignoreTaskId);
 	}
 
 	@GetMapping("/{id}/candidates")

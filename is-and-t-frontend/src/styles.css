@@ -561,3 +561,93 @@ html.theme-fade * {
     animation: none;
   }
 }
+
+/* ---- Shifts and tasks on the Planner: never confused ----
+   A shift (when someone works) is a lightly striped band in the portal's colour.
+   A task (a job to do) is a solid card with a shadow and a thick stripe on the left, coloured by
+   status: amber = nobody has it, portal colour = assigned, green = done, grey = not done/cancelled. */
+
+.day-shift {
+  background: repeating-linear-gradient(135deg,
+      color-mix(in oklab, var(--accent-from) 20%, transparent) 0 7px,
+      color-mix(in oklab, var(--accent-from) 11%, transparent) 7px 14px);
+  border: 1.5px solid color-mix(in oklab, var(--accent-from) 60%, transparent);
+}
+
+/* An extra shift (that day only): dashed */
+.day-shift.is-extra {
+  border-style: dashed;
+}
+
+:root {
+  --task-fill: #ffffff;
+  --task-edge: rgb(15 23 42 / 0.12);
+  --task-shadow: 0 2px 8px -3px rgb(15 23 42 / 0.3);
+  --task-unassigned-fill: #fffbeb;
+  --task-done-fill: #f0fdf4;
+}
+
+:root[data-theme='dark'] {
+  --task-fill: #1e2638;
+  --task-edge: rgb(255 255 255 / 0.14);
+  --task-shadow: 0 2px 10px -2px rgb(0 0 0 / 0.7);
+  --task-unassigned-fill: #3b2a0c;
+  --task-done-fill: #10291c;
+}
+
+.task-card {
+  --stripe: var(--accent-from);
+  background: var(--task-fill);
+  border: 1px solid var(--task-edge);
+  border-left: 4px solid var(--stripe);
+  box-shadow: var(--task-shadow);
+}
+
+.task-card.is-unassigned {
+  --stripe: #f59e0b;
+  background: var(--task-unassigned-fill);
+}
+
+.task-card.is-done {
+  --stripe: #10b981;
+  background: var(--task-done-fill);
+}
+
+.task-card.is-closed {
+  --stripe: #94a3b8;
+  opacity: 0.65;
+}
+
+/* A task's position on a small timeline (the week board): a solid tick, so it stands out from the band */
+.task-tick {
+  background: var(--stripe, var(--accent-to));
+  box-shadow: 0 0 0 1.5px var(--task-fill);
+}
+
+.task-tick.is-unassigned {
+  --stripe: #f59e0b;
+}
+
+.task-tick.is-done {
+  --stripe: #10b981;
+}
+
+/* Dragging on a timeline to pick a time for a new task */
+.drag-preview {
+  position: absolute;
+  top: 0.2rem;
+  bottom: 0.2rem;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  padding-left: 0.35rem;
+  white-space: nowrap;
+  border: 2px dashed var(--accent-edge);
+  border-radius: 0.6rem;
+  background: color-mix(in oklab, var(--accent-from) 20%, transparent);
+  color: var(--text);
+  font-size: 0.68rem;
+  font-weight: 700;
+  pointer-events: none;
+}

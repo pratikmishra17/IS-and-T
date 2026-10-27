@@ -30,6 +30,16 @@ export const SUPPLY_SUGGESTIONS = [
   '16" Laptop', '17" Laptop', 'Keyboard', 'Mouse', 'Webcam',
 ];
 
+/** The colour a task is drawn in (task-card / task-tick classes in styles.css), by status. */
+export function taskTone(status: TaskStatus): string {
+  switch (status) {
+    case 'UNASSIGNED': return 'is-unassigned';
+    case 'COMPLETED': return 'is-done';
+    case 'ASSIGNED': return 'is-assigned';
+    default: return 'is-closed';
+  }
+}
+
 /** "2 × Dual Monitors, Webcam" */
 export function suppliesText(supplies: Supply[]): string {
   return supplies.map((s) => (s.quantity === 1 ? s.name : `${s.quantity} × ${s.name}`)).join(', ');
@@ -90,6 +100,8 @@ export interface Candidate {
   name: string;
   /** On shift for the whole task and free then. */
   eligible: boolean;
+  /** Why not, when not eligible: "not on shift for the whole time", "has another task then"… */
+  note: string | null;
 }
 
 export interface Backorder {
@@ -138,6 +150,11 @@ export class AdminTaskApi {
 
   candidates(id: number): Promise<Candidate[]> {
     return firstValueFrom(this.http.get<Candidate[]>(`/api/admin/tasks/${id}/candidates`));
+  }
+
+  /** Who'd be free for a task being written: every active student, with why not if not. */
+  availability(date: string, start: string, minutes: number): Promise<Candidate[]> {
+    return firstValueFrom(this.http.get<Candidate[]>('/api/admin/tasks/availability', { params: { date, start, minutes } }));
   }
 
   assign(id: number, studentId: number | null): Promise<Saved<Task>> {

@@ -1,0 +1,263 @@
+import { NgTemplateOutlet } from '@angular/common';
+import { Component, OnDestroy, computed, input, output, signal } from '@angular/core';
+import { Week, clock, minutes } from '../../../services/schedule';
+import { STATUS_LABEL, Task, taskTone } from '../../../services/tasks';
+import { PickedTime, TimeDrag } from '../../../ui/time-drag';
+
+type Student = Week['students'][number];
+
+/** Height of one line of tasks in a row, in rem. Overlapping tasks go on separate lines. */
+const LANE_REM = 2.75;
+
+/** A task placed on the timeline: which line of its row it's on. */
+interface Placed {
+  task: Task;
+  lane: number;
+}
+
+/** What a drag or click on an empty spot asks for: a new task on this day, at this time, for someone (or nobody yet). */
+export interface NewTaskAt {
+  startTime: string;
+  minutes: number;
+  student?: Student;
+  unassigned?: boolean;
+}
+
+/**
+ * The Planner's Day view: one day as a timeline. Hours run left to right; each student is a row
+ * with their shift(s) as bars and their tasks on top, and a row of tasks nobody has yet comes first.
+ * Dragging across an empty part of a row (or clicking it, for 30 minutes) adds a task then; clicking a
+ * task opens it. On today, a line
+ * marks the current time.
+ */
+@Component({
+  selector: 'app-day-timeline',
+  template: `
+    <div class="overflow-x-auto">
+      <div class="min-w-[60rem]">
+        <!-- The hours -->
+        <div class="grid grid-cols-[11rem_1fr] border-b border-slate-200/70">
+          <div></div>
+          <div class="relative h-8" aria-hidden="true">
+            @for (hour of hourMarks(); track hour) {
+              <span class="absolute bottom-1.5 -translate-x-1/2 text-[0.7rem] font-medium tabular-nums text-slate-500" [style.left.%]="x(hour)">{{ hourLabel(hour) }}</span>
+            }
+          </div>
+        </div>
+
+        <!-- Tasks nobody has yet -->
+        <div class="grid grid-cols-[11rem_1fr] border-b border-slate-200/60">
+          <div class="bg-amber-50/50 px-3 py-2.5">
+            <p class="font-semibold text-amber-950">Unassigned</p>
+            <p class="text-xs text-amber-800">{{ unassigned().length }} {{ unassigned().length === 1 ? 'task needs' : 'tasks need' }} someone</p>
+          </div>
+          <div class="day-track relative bg-amber-50/30" [style.height.rem]="rowHeight(unassignedLanes())"
+            title="Drag (or click) to add an unassigned task at that time" [appTimeDrag]="range()" (picked)="picked($event)">
+            <ng-container *ngTemplateOutlet="grid" />
+            @for (placed of unassigned(); track placed.task.id) {
+              <ng-container *ngTemplateOutlet="taskBlock; context: { $implicit: placed }" />
+            }
+            <ng-container *ngTemplateOutlet="nowLine" />
+          </div>
+        </div>
+
+        @if (rows().length === 0) {
+          <p class="py-12 text-center text-sm text-slate-600">No active students yet. Add them on the Users page.</p>
+        }
+
+        @for (row of rows(); track row.student.studentId) {
+          <div class="grid grid-cols-[11rem_1fr] border-b border-slate-200/60 last:border-b-0">
+            <div class="px-3 py-2.5">
+              <p class="truncate font-semibold text-slate-900">{{ row.student.name }}</p>
+              <p class="text-xs text-slate-500">
+                @if (row.cancelled) { Day off }
+                @else if (row.shifts.length === 0) { Not working }
+                @else { {{ row.hours }} h on shift }
+              </p>
+              <button type="button" class="btn btn-quiet mt-1.5 px-2 py-0.5 text-xs" [attr.aria-label]="'Edit ' + row.student.name + '’s schedule'" (click)="editSchedule.emit(row.student)">
+                <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></svg>
+                Edit schedule
+              </button>
+            </div>
+            <div class="day-track relative" [style.height.rem]="rowHeight(row.lanes)"
+              [title]="'Drag (or click) to add a task for ' + row.student.name + ' at that time'" [appTimeDrag]="range()" (picked)="picked($event, row.student)">
+              <ng-container *ngTemplateOutlet="grid" />
+              @for (shift of row.shifts; track shift.start) {
+                <div class="day-shift pointer-events-none absolute inset-y-1.5 rounded-xl" [class.is-extra]="shift.extra"
+                  [style.left.%]="x(shift.start)" [style.width.%]="x(shift.end) - x(shift.start)">
+                  <span class="absolute bottom-0.5 left-2 text-[0.65rem] font-semibold text-teal-900">{{ shift.extra ? 'Extra shift ' : 'Shift ' }}{{ shift.start }}–{{ shift.end }}</span>
+                </div>
+              }
+              @for (off of row.timeOff; track off.start) {
+                <div class="shift-class pointer-events-none absolute inset-y-1.5 rounded-xl" [style.left.%]="x(off.start)" [style.width.%]="x(off.end) - x(off.start)"
+                  [title]="'Time off ' + off.start + '–' + off.end">
+                  <span class="absolute bottom-0.5 left-2 text-[0.65rem] font-semibold text-slate-600">Off</span>
+                </div>
+              }
+              @if (row.cancelled) {
+                <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-slate-500">Day off</span>
+              }
+              @for (placed of row.tasks; track placed.task.id) {
+                <ng-container *ngTemplateOutlet="taskBlock; context: { $implicit: placed }" />
+              }
+              <ng-container *ngTemplateOutlet="nowLine" />
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+
+    <p class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
+      <span class="flex items-center gap-1.5"><span class="day-shift inline-block h-3.5 w-7 rounded"></span> Shift (working)</span>
+      <span class="flex items-center gap-1.5"><span class="day-shift is-extra inline-block h-3.5 w-7 rounded"></span> Extra shift</span>
+      <span class="flex items-center gap-1.5"><span class="task-card is-assigned inline-block h-3.5 w-7 rounded"></span> Task</span>
+      <span class="flex items-center gap-1.5"><span class="task-card is-unassigned inline-block h-3.5 w-7 rounded"></span> Unassigned task</span>
+      <span class="flex items-center gap-1.5"><span class="task-card is-done inline-block h-3.5 w-7 rounded"></span> Done</span>
+      <span class="flex items-center gap-1.5"><span class="shift-class inline-block h-3.5 w-7 rounded"></span> Time off</span>
+      @if (isToday()) { <span class="flex items-center gap-1.5"><span class="inline-block h-3.5 w-0.5 bg-rose-500"></span> Now</span> }
+      <span>Drag across a row to add a task for that time; a click makes a 30-minute one.</span>
+    </p>
+
+    <!-- Hour lines, behind everything in a row -->
+    <ng-template #grid>
+      @for (hour of hourMarks(); track hour) {
+        <span class="pointer-events-none absolute inset-y-0 w-px bg-slate-300/40" [style.left.%]="x(hour)"></span>
+      }
+    </ng-template>
+
+    <ng-template #nowLine>
+      @if (isToday() && now() >= range().start && now() <= range().end) {
+        <span class="pointer-events-none absolute inset-y-0 z-10 w-0.5 bg-rose-500" [style.left.%]="x(now())"></span>
+      }
+    </ng-template>
+
+    <ng-template #taskBlock let-placed>
+      <button type="button" class="task-card absolute z-[5] flex items-center gap-1.5 overflow-hidden rounded-lg px-2 text-left text-xs"
+        [attr.data-task]="placed.task.id" [class.task-highlight]="highlight() === placed.task.id"
+        [class]="tone(placed.task)"
+        [style.top.rem]="0.375 + placed.lane * laneRem" [style.height.rem]="laneRem - 0.375"
+        [style.left.%]="x(placed.task.startTime)" [style.width]="'max(8.5rem, ' + (x(placed.task.endTime) - x(placed.task.startTime)) + '%)'"
+        [attr.aria-label]="placed.task.title + ', ' + placed.task.startTime + ' to ' + placed.task.endTime + ', ' + status(placed.task) + (placed.task.assignee ? ', ' + placed.task.assignee.name : '')"
+        [title]="placed.task.startTime + '–' + placed.task.endTime + ' ' + placed.task.title + ' · ' + placed.task.location"
+        (click)="openTask.emit(placed.task)">
+        <span class="shrink-0 font-semibold tabular-nums text-slate-500">{{ placed.task.startTime }}</span>
+        <span class="truncate font-medium text-slate-900">{{ placed.task.title }}</span>
+        <span class="hidden truncate text-slate-500 xl:inline">· {{ placed.task.location }}</span>
+        @if (placed.task.claimedOffShift) { <span title="Claimed while not on shift">⚠</span> }
+      </button>
+    </ng-template>
+  `,
+  imports: [NgTemplateOutlet, TimeDrag],
+})
+export class DayTimeline implements OnDestroy {
+  readonly date = input.required<string>();
+  readonly week = input.required<Week>();
+  /** The week's tasks; this view picks out the day's. */
+  readonly tasks = input.required<Task[]>();
+  readonly highlight = input<number | null>(null);
+
+  readonly openTask = output<Task>();
+  readonly addTask = output<NewTaskAt>();
+  readonly editSchedule = output<Student>();
+
+  protected readonly laneRem = LANE_REM;
+  /** Minutes after midnight, now; ticks every minute for the "now" line. */
+  protected readonly now = signal(this.minutesNow());
+  private readonly timer = setInterval(() => this.now.set(this.minutesNow()), 60_000);
+
+  protected readonly isToday = computed(() => this.date() === new Date().toLocaleDateString('en-CA'));
+  protected readonly dayTasks = computed(() => this.tasks().filter((task) => task.date === this.date() && task.status !== 'CANCELLED'));
+  protected readonly unassigned = computed(() => lanes(this.dayTasks().filter((task) => task.status === 'UNASSIGNED')));
+  protected readonly unassignedLanes = computed(() => laneCount(this.unassigned()));
+
+  /** One row per student: their shifts, time off and tasks that day. */
+  protected readonly rows = computed(() => this.week().students.map((student) => {
+    const day = student.days.find((d) => d.date === this.date());
+    const shifts = day?.shifts ?? [];
+    const tasks = lanes(this.dayTasks().filter((task) => task.assignee?.id === student.studentId));
+    return {
+      student,
+      shifts,
+      timeOff: day?.timeOff ?? [],
+      cancelled: day?.cancelled ?? false,
+      hours: Math.round(shifts.reduce((sum, s) => sum + minutes(s.end) - minutes(s.start), 0) / 6) / 10,
+      tasks,
+      lanes: laneCount(tasks),
+    };
+  }));
+
+  /** The hours shown: 7 AM to 7 PM, stretched to fit any shift or task outside that. */
+  protected readonly range = computed(() => {
+    const times = [
+      ...this.dayTasks().flatMap((task) => [minutes(task.startTime), minutes(task.endTime)]),
+      ...this.rows().flatMap((row) => row.shifts.flatMap((s) => [minutes(s.start), minutes(s.end)])),
+    ];
+    const first = Math.min(7 * 60, ...times);
+    const last = Math.max(19 * 60, ...times);
+    return { start: Math.floor(first / 60) * 60, end: Math.ceil(last / 60) * 60 };
+  });
+
+  protected readonly hourMarks = computed(() => {
+    const marks: number[] = [];
+    for (let at = this.range().start; at <= this.range().end; at += 60) {
+      marks.push(at);
+    }
+    return marks;
+  });
+
+  ngOnDestroy(): void {
+    clearInterval(this.timer);
+  }
+
+  /** Where a time sits across the day, as a percentage of the width. */
+  protected x(time: string | number): number {
+    const at = typeof time === 'string' ? minutes(time) : time;
+    const { start, end } = this.range();
+    return ((at - start) / (end - start)) * 100;
+  }
+
+  protected rowHeight(laneTotal: number): number {
+    return Math.max(4, laneTotal * LANE_REM + 0.75);
+  }
+
+  /** 13 * 60 → "1 PM" */
+  protected hourLabel(at: number): string {
+    const hour = at / 60;
+    return `${hour % 12 || 12} ${hour < 12 ? 'AM' : 'PM'}`;
+  }
+
+  protected status(task: Task): string {
+    return STATUS_LABEL[task.status];
+  }
+
+  protected tone(task: Task): string {
+    return taskTone(task.status);
+  }
+
+  /** A time picked by dragging (or clicking) in a row: a new task then, for that student or nobody yet. */
+  protected picked(time: PickedTime, student?: Student): void {
+    this.addTask.emit({ startTime: clock(time.start), minutes: time.end - time.start, student, unassigned: !student });
+  }
+
+  private minutesNow(): number {
+    const now = new Date();
+    return now.getHours() * 60 + now.getMinutes();
+  }
+}
+
+/** Gives each task the first line of its row where it doesn't overlap an earlier one. */
+function lanes(tasks: Task[]): Placed[] {
+  const ends: number[] = [];
+  return [...tasks].sort((a, b) => a.startTime.localeCompare(b.startTime)).map((task) => {
+    let lane = ends.findIndex((end) => end <= minutes(task.startTime));
+    if (lane === -1) {
+      lane = ends.length;
+    }
+    ends[lane] = Math.max(minutes(task.endTime), minutes(task.startTime) + 100); // short tasks are drawn wider, to fit their label
+    return { task, lane };
+  });
+}
+
+function laneCount(placed: Placed[]): number {
+  return Math.max(1, ...placed.map((p) => p.lane + 1));
+}

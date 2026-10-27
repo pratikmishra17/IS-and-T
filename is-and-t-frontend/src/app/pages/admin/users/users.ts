@@ -6,6 +6,7 @@ import { errorMessage } from '../../../services/errors';
 import { Confirm } from '../../../ui/confirm';
 import { SidePanel } from '../../../ui/side-panel';
 import { Toasts } from '../../../ui/toast';
+import { remembered } from '../../../services/remember';
 
 type StatusFilter = 'all' | 'active' | 'no-password' | 'disabled';
 type SortKey = 'name' | 'studentId' | 'status';
@@ -25,14 +26,14 @@ export class AdminUsers implements OnInit {
   private readonly toasts = inject(Toasts);
   protected readonly auth = inject(Auth);
 
-  protected readonly tab = signal<AccountKind>('students');
+  protected readonly tab = remembered<AccountKind>('users.tab', 'students', { allowed: ['students', 'admins'] });
   protected readonly accounts = signal<Record<AccountKind, User[]>>({ students: [], admins: [] });
   protected readonly loading = signal(true);
   protected readonly busyId = signal<number | null>(null);
 
   // Search, filter and sort: plain signals; `rows` below recalculates whenever any of them change.
-  protected readonly search = signal('');
-  protected readonly statusFilter = signal<StatusFilter>('all');
+  protected readonly search = remembered('users.search', '', { session: true });
+  protected readonly statusFilter = remembered<StatusFilter>('users.status', 'all');
   protected readonly sortKey = signal<SortKey>('name');
   protected readonly sortAscending = signal(true);
 

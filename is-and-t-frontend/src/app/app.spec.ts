@@ -32,6 +32,9 @@ describe('App routing', () => {
   let http: HttpTestingController;
 
   beforeEach(() => {
+    // Pages remember tabs and filters in browser storage: start every test from a clean slate.
+    localStorage.clear();
+    sessionStorage.clear();
     TestBed.configureTestingModule({
       providers: [provideRouter(routes, withComponentInputBinding()), provideHttpClient(), provideHttpClientTesting()],
     });
@@ -190,9 +193,9 @@ describe('App routing', () => {
   });
 
   /** Opens the Planner with one student's week and two tasks (one theirs, one unassigned). */
-  async function openPlanner(): Promise<RouterTestingHarness> {
+  async function openPlanner(url = '/admin/planner'): Promise<RouterTestingHarness> {
     await logInAs(admin);
-    const harness = await RouterTestingHarness.create('/admin/planner');
+    const harness = await RouterTestingHarness.create(url);
     const days = ['2026-10-19', '2026-10-20', '2026-10-21', '2026-10-22', '2026-10-23'];
     const task = (id: number, title: string, status: string, assignee: { id: number; name: string } | null) => ({
       id, type: 'FIX', title, description: null, date: days[0], startTime: '11:00', endTime: '11:30', durationMinutes: 30,
@@ -214,11 +217,65 @@ describe('App routing', () => {
       task(9, 'Printer offline', 'UNASSIGNED', null),
       task(10, 'Dock setup', 'ASSIGNED', { id: 1, name: 'Sam Student' }),
     ]);
+    http.expectOne('/api/admin/schedule/requests').flush([]);
+    http.expectOne('/api/admin/time-off').flush([]);
     await new Promise((resolve) => setTimeout(resolve));
     await harness.fixture.whenStable();
     harness.detectChanges();
     return harness;
   }
+
+  it('shows one day as a timeline: shifts as bars, tasks on top, unassigned ones first', async () => {
+    const harness = await openPlanner('/admin/planner?view=day&date=2026-10-19');
+    const page = harness.fixture.nativeElement as HTMLElement;
+    const text = page.textContent!;
+
+    expect(text).toContain('Monday, October 19, 2026');
+    const timeline = page.querySelector('app-day-timeline')!;
+    const rows = timeline.querySelectorAll('.day-track');
+    expect(rows[0].textContent).toContain('Printer offline'); // the unassigned row
+    expect(rows[1].textContent).toContain('Dock setup'); // Sam's row
+    expect(rows[1].textContent).toContain('09:00–13:00');
+    expect(rows[1].textContent).toContain('Extra shift 15:00–17:00');
+
+    // Clicking an empty spot in Sam's row starts a task for Sam on that day
+    const track = rows[1] as HTMLElement;
+    Object.defineProperty(track, 'clientWidth', { value: 1200 });
+    track.getBoundingClientRect = () => ({ left: 0, top: 0, right: 1200, bottom: 50, width: 1200, height: 50, x: 0, y: 0, toJSON: () => ({}) });
+    // A press and release without dragging, halfway across 7 AM–7 PM: a 30-minute task at 1 PM
+    track.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientX: 600, button: 0 }));
+    track.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, clientX: 600 }));
+    await new Promise((resolve) => setTimeout(resolve));
+    http.expectOne('/api/admin/settings').flush({ digestTime: '08:00', defaultTaskDuration: 30, admins: [] });
+    await new Promise((resolve) => setTimeout(resolve));
+    http.expectOne('/api/admin/inventory/items').flush([]);
+    http.expectOne('/api/admin/inventory/locations').flush([]);
+    await new Promise((resolve) => setTimeout(resolve));
+    http.expectOne((r) => r.url === '/api/admin/tasks/availability').flush([{ id: 1, name: 'Sam Student', eligible: true, note: null }]);
+    await new Promise((resolve) => setTimeout(resolve));
+    await harness.fixture.whenStable();
+    harness.detectChanges();
+    expect(page.querySelector<HTMLInputElement>('#task-date')!.value).toBe('2026-10-19');
+    expect(page.querySelector<HTMLInputElement>('#task-start')!.value).toBe('13:00');
+    expect(page.querySelector<HTMLInputElement>('#task-duration')!.value).toBe('30');
+    expect(page.querySelector<HTMLSelectElement>('#task-who')!.selectedOptions[0].textContent?.trim()).toBe('Sam Student ✓');
+  });
+
+  it('remembers the Planner view after going to another page and back', async () => {
+    const harness = await openPlanner('/admin/planner?view=day&date=2026-10-19');
+    await harness.navigateByUrl('/admin/users');
+    http.match(() => true).forEach((request) => request.flush([]));
+    await harness.navigateByUrl('/admin/planner'); // the sidebar link: no view in the address
+    await new Promise((resolve) => setTimeout(resolve));
+
+    expect(TestBed.inject(Router).url).toBe('/admin/planner?view=day&date=2026-10-19');
+  });
+
+  it('sends the old Tasks and Schedules pages to the Planner', async () => {
+    await logInAs(admin);
+    await RouterTestingHarness.create('/admin/tasks');
+    expect(TestBed.inject(Router).url).toBe('/admin/planner?view=list');
+  });
 
   it('shows everyone’s shifts and tasks for the week on the Planner', async () => {
     const harness = await openPlanner();
@@ -254,7 +311,7 @@ describe('App routing', () => {
     harness.detectChanges();
     const panel = harness.fixture.nativeElement as HTMLElement;
 
-    expect(panel.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toContain('Calendar');
+    expect(panel.querySelector('app-shift-week-editor [role="tab"][aria-selected="true"]')?.textContent).toContain('Calendar');
     expect(panel.querySelectorAll('[data-shift]').length).toBe(1);
   });
 
@@ -395,10 +452,7 @@ describe('App routing', () => {
   });
 
   it('creates a task with just a title and location, picking and typing things to bring, left unassigned', async () => {
-    await logInAs(admin);
-    const harness = await RouterTestingHarness.create('/admin/tasks');
-    http.expectOne((request) => request.url === '/api/admin/tasks').flush([]);
-    await harness.fixture.whenStable();
+    const harness = await openPlanner('/admin/planner?view=list');
     const page = harness.fixture.nativeElement as HTMLElement;
     const settle = async () => {
       await new Promise((resolve) => setTimeout(resolve));
@@ -418,7 +472,10 @@ describe('App routing', () => {
     await settle();
     http.expectOne('/api/admin/inventory/items').flush([]); // no inventory at all: still fine
     http.expectOne('/api/admin/inventory/locations').flush([]);
-    http.expectOne('/api/admin/students').flush([student]);
+    await settle();
+    http.expectOne((r) => r.url === '/api/admin/tasks/availability').flush([
+      { id: 1, name: 'Sam Admin', eligible: false, note: 'not working that day' },
+    ]);
     await settle();
     await settle();
 
@@ -435,7 +492,8 @@ describe('App routing', () => {
 
     // "Who does it": leave it unassigned
     const who = page.querySelector<HTMLSelectElement>('#task-who')!;
-    expect([...who.options].map((o) => o.textContent?.trim())).toContain('Sam Admin');
+    // Everyone can be chosen; someone who isn't free says why
+    expect([...who.options].map((o) => o.textContent?.trim())).toContain('Sam Admin: not working that day');
     who.value = 'none';
     who.dispatchEvent(new Event('change'));
     await settle();

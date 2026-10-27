@@ -27,8 +27,9 @@ export const routes: Routes = [
           { path: 'planner', title: 'Planner · IS&T Admin', loadComponent: () => import('./pages/admin/planner/planner').then((m) => m.AdminPlanner) },
           { path: 'users', title: 'Users · IS&T Admin', loadComponent: () => import('./pages/admin/users/users').then((m) => m.AdminUsers) },
           { path: 'calendar', title: 'Calendar · IS&T Admin', loadComponent: () => import('./pages/admin/calendar/calendar').then((m) => m.AdminCalendar) },
-          { path: 'schedules', title: 'Schedules · IS&T Admin', loadComponent: () => import('./pages/admin/schedules/schedules').then((m) => m.AdminSchedules) },
-          { path: 'tasks', title: 'Tasks · IS&T Admin', loadComponent: () => import('./pages/admin/tasks/tasks').then((m) => m.AdminTasks) },
+          // Schedules and tasks now live together on the Planner; the old addresses lead there
+          { path: 'schedules', redirectTo: '/admin/planner?view=requests' },
+          { path: 'tasks', redirectTo: '/admin/planner?view=list' },
           { path: 'inventory', title: 'Inventory · IS&T Admin', loadComponent: () => import('./pages/admin/inventory/inventory').then((m) => m.AdminInventory) },
           { path: 'settings', title: 'Settings · IS&T Admin', loadComponent: () => import('./pages/admin/settings/settings').then((m) => m.AdminSettings) },
           { path: 'account', title: 'My account · IS&T Admin', loadComponent: () => import('./pages/account/account').then((m) => m.Account) },
