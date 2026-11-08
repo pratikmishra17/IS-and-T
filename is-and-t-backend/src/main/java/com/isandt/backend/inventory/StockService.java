@@ -123,9 +123,9 @@ public class StockService {
 		return itemService.describe(item);
 	}
 
-	/** A completed deployment used this many from this room. Recorded against the task and student. */
+	/** A completed deployment used this many from this room. Recorded against the task (named in the note) and student. */
 	@Transactional
-	void deductForTask(Item item, StorageLocation location, int quantity, Long taskId, Student student) {
+	void deductForTask(Item item, StorageLocation location, int quantity, Long taskId, String taskTitle, Student student) {
 		StockLevel level = stock.findByItemAndLocation(item, location)
 				.orElseThrow(() -> new ConflictException("There are no " + item.getName() + " in " + location.label() + "."));
 		if (level.getQuantityOnHand() < quantity) {
@@ -133,7 +133,7 @@ public class StockService {
 					+ location.label() + ", not " + quantity + ". Ask an admin to correct the count first.");
 		}
 		level.change(-quantity);
-		transactions.save(InventoryTransaction.forTask(level, -quantity, taskId, student));
+		transactions.save(InventoryTransaction.forTask(level, -quantity, taskId, taskTitle, student));
 	}
 
 	@Transactional(readOnly = true)

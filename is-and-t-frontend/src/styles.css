@@ -144,6 +144,11 @@ body {
   button, input, textarea, select {
     font: inherit;
   }
+  /* A fieldset normally won't shrink below its widest content (a long dropdown option, say), so on
+     a phone it pushed the whole form wider than the screen. Let it shrink like any other box. */
+  fieldset {
+    min-width: 0;
+  }
 }
 
 ::selection {
@@ -682,4 +687,51 @@ tr.drop-over > th {
   font-size: 0.68rem;
   font-weight: 700;
   pointer-events: none;
+}
+
+/* Tab bars (role="tablist"): a tab's name never breaks over two lines. On phones the tabs are a
+   little narrower, and a bar that still doesn't fit wraps onto a second row instead of running off
+   the screen. Outside any @layer, so it wins over the Tailwind classes in the templates. */
+[role='tablist'] {
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+[role='tab'] {
+  white-space: nowrap;
+}
+@media (width < 40rem) {
+  [role='tab'] {
+    padding-inline: 0.75rem;
+  }
+}
+
+/* The Planner and Team timelines (Day view and week board) scroll sideways when the screen is too
+   narrow for them. The names column (.tl-name) stays pinned on the left meanwhile, so you always
+   know whose row you're looking at. It needs a solid fill so the hours don't show through as they
+   slide underneath; the row's tint is painted on top of that fill (tint-amber: Unassigned,
+   tint-teal: your own row). Pinned at every width: even a desktop scrolls a week with its weekend. */
+.week-board {
+  min-width: calc(var(--board-days, 5) * 10rem + 11rem);
+}
+@media (width < 40rem) {
+  .week-board {
+    min-width: calc(var(--board-days, 5) * 9rem + 7rem);
+  }
+}
+.tl-name {
+  position: sticky;
+  left: 0;
+  z-index: 30;
+  background-color: var(--menu-fill);
+}
+/* The week board leaves 0.25rem between cells (border-spacing); cover that strip left of the pinned
+   names too, or slivers of the days scrolling past show through it. */
+.week-board .tl-name {
+  box-shadow: -0.25rem 0 0 var(--menu-fill);
+}
+.tl-name.tint-amber {
+  background-image: linear-gradient(color-mix(in oklab, var(--color-amber-50) 60%, transparent), color-mix(in oklab, var(--color-amber-50) 60%, transparent));
+}
+.tl-name.tint-teal {
+  background-image: linear-gradient(color-mix(in oklab, var(--color-teal-50) 70%, transparent), color-mix(in oklab, var(--color-teal-50) 70%, transparent));
 }

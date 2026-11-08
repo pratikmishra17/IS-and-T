@@ -9,14 +9,15 @@
         <a routerLink="/admin/calendar" class="font-medium text-amber-800 hover:underline">No semester covers today. Add one →</a>
       }
       @if (nextHoliday(); as holiday) {
-        <span aria-hidden="true" class="text-slate-300">|</span>
+        <span aria-hidden="true" class="hidden text-slate-300 sm:inline">|</span><!-- phones: the two parts go on separate lines, so no divider -->
         <span>Next holiday: <span class="font-medium text-slate-800">{{ holiday.name }}</span>, {{ holiday.date | date: 'EEE, MMM d' }}</span>
       }
     </p>
   }
 </div>
 
-<section aria-label="Accounts at a glance" class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+<!-- Two tiles a row on phones and tablets, four on wide screens -->
+<section aria-label="Accounts at a glance" class="mt-6 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
   <a routerLink="/admin/users" class="glass-panel rounded-3xl p-5 hover:bg-white/70">
     <p class="text-sm font-medium text-slate-600">Active students</p>
     <p class="mt-2 text-3xl font-semibold text-slate-900">{{ loading() ? '–' : activeStudents() }}</p>

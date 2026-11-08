@@ -163,13 +163,14 @@ type Drag =
     <ng-template #rowsTemplate let-rows>
       <ul class="mt-2 space-y-1.5">
         @for (row of rows; track row.index) {
+          <!-- Phones: the day on its own line, the times below it. From sm (640px) up: one line. -->
           <li class="flex flex-wrap items-center gap-2">
-            <span class="w-24 text-sm font-medium text-slate-900">{{ label(row.block.day) }}</span>
+            <span class="w-full text-sm font-medium text-slate-900 sm:w-24">{{ label(row.block.day) }}</span>
             <label class="sr-only" [for]="'shift-start-' + row.index">{{ label(row.block.day) }} start</label>
-            <input [id]="'shift-start-' + row.index" type="time" step="900" class="glass-input w-32 rounded-xl px-2 py-1.5 text-sm" [value]="row.block.start" (change)="edit(row.index, 'start', $any($event.target).value)" />
+            <input [id]="'shift-start-' + row.index" type="time" step="900" class="glass-input min-w-0 flex-1 rounded-xl px-2 py-1.5 text-sm sm:w-32 sm:flex-none" [value]="row.block.start" (change)="edit(row.index, 'start', $any($event.target).value)" />
             <span class="text-slate-400" aria-hidden="true">–</span>
             <label class="sr-only" [for]="'shift-end-' + row.index">{{ label(row.block.day) }} end</label>
-            <input [id]="'shift-end-' + row.index" type="time" step="900" class="glass-input w-32 rounded-xl px-2 py-1.5 text-sm" [value]="row.block.end" (change)="edit(row.index, 'end', $any($event.target).value)" />
+            <input [id]="'shift-end-' + row.index" type="time" step="900" class="glass-input min-w-0 flex-1 rounded-xl px-2 py-1.5 text-sm sm:w-32 sm:flex-none" [value]="row.block.end" (change)="edit(row.index, 'end', $any($event.target).value)" />
             @if (row.clash) { <span class="badge bg-rose-100 text-rose-900">Overlaps a class</span> }
             <button type="button" class="icon-button ml-auto" [attr.aria-label]="'Delete ' + label(row.block.day) + ' ' + row.block.start" (click)="remove([row.index])">✕</button>
           </li>

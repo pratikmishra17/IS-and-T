@@ -9,18 +9,21 @@ import { ALL_DAYS, Day, TimeBlock, WEEKDAYS, dayName, totalHours } from '../serv
 @Component({
   selector: 'app-time-blocks-editor',
   template: `
-    <div class="space-y-2">
+    <!-- Phones: the day on its own line, the times below it. From sm (640px) up: one line. -->
+    <div class="space-y-3 sm:space-y-2">
       @for (block of blocks(); track $index; let i = $index) {
-        <div class="flex items-center gap-2">
+        <div class="flex flex-wrap items-center gap-2 sm:flex-nowrap">
           <label class="sr-only" [for]="idPrefix() + '-day-' + i">Day</label>
-          <select [id]="idPrefix() + '-day-' + i" class="glass-input min-w-0 flex-1 rounded-xl px-2 py-2 text-sm" [value]="block.day" (change)="update(i, 'day', $any($event.target).value)">
-            @for (day of days(); track day) { <option [value]="day">{{ label(day) }}</option> }
+          <select [id]="idPrefix() + '-day-' + i" class="glass-input w-full rounded-xl px-2 py-2 text-sm sm:w-auto sm:min-w-0 sm:flex-1" [value]="block.day" (change)="update(i, 'day', $any($event.target).value)">
+            <!-- [selected] on the option, not only [value] on the select: the select's value is set
+                 before these options exist, so on its own it falls back to the first day. -->
+            @for (day of days(); track day) { <option [value]="day" [selected]="day === block.day">{{ label(day) }}</option> }
           </select>
           <label class="sr-only" [for]="idPrefix() + '-start-' + i">Start</label>
-          <input [id]="idPrefix() + '-start-' + i" type="time" class="glass-input w-28 rounded-xl px-2 py-2 text-sm" [value]="block.start" (change)="update(i, 'start', $any($event.target).value)" />
+          <input [id]="idPrefix() + '-start-' + i" type="time" class="glass-input min-w-0 flex-1 rounded-xl px-2 py-2 text-sm sm:w-28 sm:flex-none" [value]="block.start" (change)="update(i, 'start', $any($event.target).value)" />
           <span class="text-slate-400" aria-hidden="true">–</span>
           <label class="sr-only" [for]="idPrefix() + '-end-' + i">End</label>
-          <input [id]="idPrefix() + '-end-' + i" type="time" class="glass-input w-28 rounded-xl px-2 py-2 text-sm" [value]="block.end" (change)="update(i, 'end', $any($event.target).value)"
+          <input [id]="idPrefix() + '-end-' + i" type="time" class="glass-input min-w-0 flex-1 rounded-xl px-2 py-2 text-sm sm:w-28 sm:flex-none" [value]="block.end" (change)="update(i, 'end', $any($event.target).value)"
             [attr.aria-invalid]="block.end <= block.start" />
           <button type="button" class="icon-button shrink-0" [attr.aria-label]="'Remove ' + label(block.day) + ' ' + block.start" (click)="remove(i)">✕</button>
         </div>

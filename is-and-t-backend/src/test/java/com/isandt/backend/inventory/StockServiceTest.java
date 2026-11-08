@@ -59,6 +59,17 @@ class StockServiceTest {
 	}
 
 	@Test
+	void aDeploymentsUseIsRecordedAgainstTheTaskByName() {
+		service.deductForTask(keyboard, room, 2, 5L, "Desk setup for Dr. Patel", null);
+
+		assertThat(level.getQuantityOnHand()).isEqualTo(8);
+		ArgumentCaptor<InventoryTransaction> saved = ArgumentCaptor.forClass(InventoryTransaction.class);
+		verify(transactions).save(saved.capture());
+		assertThat(saved.getValue().getReason()).isEqualTo(TransactionReason.DEPLOYMENT);
+		assertThat(saved.getValue().getNote()).isEqualTo("Used for “Desk setup for Dr. Patel”");
+	}
+
+	@Test
 	void settingACountRecordsTheDifference() {
 		service.adjust(new StockAdjustment(1L, 2L, AdjustmentType.SET, 7, "Counted"), 9L);
 

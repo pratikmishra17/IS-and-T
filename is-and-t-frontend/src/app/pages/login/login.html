@@ -46,7 +46,7 @@
       <p role="alert" class="rounded-2xl bg-rose-50/80 px-4 py-3 text-sm text-rose-900">
         {{ error() }}
         @if (wrongPortal()) {
-          <a [routerLink]="portal() === 'admin' ? '/login' : '/admin/login'" class="font-semibold underline">Go to the {{ portal() === 'admin' ? 'student' : 'admin' }} portal</a>
+          <a [routerLink]="portal() === 'admin' ? '/login' : '/admin/login'" (click)="carryEmailOver()" class="font-semibold underline">Go to the {{ portal() === 'admin' ? 'student' : 'admin' }} portal</a>
         }
       </p>
     }

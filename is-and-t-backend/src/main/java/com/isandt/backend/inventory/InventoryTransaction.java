@@ -61,9 +61,10 @@ public class InventoryTransaction {
 	protected InventoryTransaction() {
 	}
 
-	static InventoryTransaction forTask(StockLevel stock, int delta, Long taskId, Student student) {
+	/** Stock a completed deployment used. The note names the task, so the history reads without looking it up. */
+	static InventoryTransaction forTask(StockLevel stock, int delta, Long taskId, String taskTitle, Student student) {
 		InventoryTransaction transaction = new InventoryTransaction(stock, delta, TransactionReason.DEPLOYMENT,
-				"Task #" + taskId, null);
+				"Used for “" + taskTitle + "”", null);
 		transaction.taskId = taskId;
 		transaction.student = student;
 		return transaction;

@@ -13,13 +13,14 @@
   } @else if (semesters().length === 0) {
     <p class="py-10 text-center text-sm text-slate-600">No semesters yet. Add the current one to set students’ weekly hour limit.</p>
   } @else {
-    <div class="mt-4 overflow-x-auto">
-      <table class="w-full min-w-[36rem] text-left text-sm">
+    <div class="relative mt-4 overflow-x-auto">
+      <!-- Phones: the dates and hour limit go under the name; the buttons stay. From sm (640px) up: all columns. -->
+      <table class="w-full text-left text-sm sm:min-w-[36rem]">
         <thead class="border-b border-slate-200/80 text-xs uppercase tracking-wider text-slate-500">
           <tr>
             <th scope="col" class="px-3 py-3 font-semibold">Semester</th>
-            <th scope="col" class="px-3 py-3 font-semibold">Dates</th>
-            <th scope="col" class="px-3 py-3 font-semibold">Hours / week</th>
+            <th scope="col" class="hidden px-3 py-3 font-semibold sm:table-cell">Dates</th>
+            <th scope="col" class="hidden px-3 py-3 font-semibold sm:table-cell">Hours / week</th>
             <th scope="col" class="px-3 py-3 text-right font-semibold">Actions</th>
           </tr>
         </thead>
@@ -29,9 +30,10 @@
               <td class="px-3 py-3">
                 <span class="font-medium text-slate-900">{{ semester.name }}</span>
                 @if (semester.current) { <span class="badge ml-2 bg-teal-100 text-teal-900">Current</span> }
+                <span class="mt-1 block text-xs text-slate-600 sm:hidden">{{ semester.startDate | date: 'MMM d, y' }} – {{ semester.endDate | date: 'MMM d, y' }} · {{ semester.weeklyHourLimit }} h a week</span>
               </td>
-              <td class="px-3 py-3 text-slate-700">{{ semester.startDate | date: 'MMM d, y' }} – {{ semester.endDate | date: 'MMM d, y' }}</td>
-              <td class="px-3 py-3 text-slate-700">{{ semester.weeklyHourLimit }} h</td>
+              <td class="hidden px-3 py-3 text-slate-700 sm:table-cell">{{ semester.startDate | date: 'MMM d, y' }} – {{ semester.endDate | date: 'MMM d, y' }}</td>
+              <td class="hidden px-3 py-3 text-slate-700 sm:table-cell">{{ semester.weeklyHourLimit }} h</td>
               <td class="px-3 py-3">
                 <div class="flex justify-end gap-0.5">
                   <button type="button" class="icon-button" [attr.aria-label]="'Edit ' + semester.name" title="Edit" (click)="openEditSemester(semester)">

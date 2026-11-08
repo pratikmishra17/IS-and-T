@@ -91,7 +91,7 @@ class TeamTaskServiceTest {
 
 		assertThat(task.getStatus()).isEqualTo(TaskStatus.COMPLETED);
 		assertThat(task.getAssignee()).isEqualTo(rita);
-		verify(reservations).fulfil(5L, Map.of(), rita); // the stock used is counted against Rita
+		verify(reservations).fulfil(eq(5L), any(), eq(Map.of()), eq(rita)); // the stock used is counted against Rita
 		verify(workflow).record(task, TaskEventType.COMPLETED, "Sam Student", "For Rita Student");
 	}
 

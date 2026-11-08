@@ -118,8 +118,9 @@
         <label for="task-title" class="field-label">Title</label>
         <input id="task-title" name="title" [(ngModel)]="draft.title" required maxlength="200" [placeholder]="draft.type === 'DEPLOYMENT' ? 'New hire setup: laptop, 2 monitors' : 'Printer not connecting'" class="glass-input w-full rounded-xl px-3 py-2.5 text-sm" />
       </div>
-      <div class="grid grid-cols-3 gap-2">
-        <div><label for="task-date" class="field-label">Date</label><input id="task-date" name="date" type="date" [(ngModel)]="draft.date" (ngModelChange)="timeChanged()" required class="glass-input w-full rounded-xl px-2 py-2.5 text-sm" /></div>
+      <!-- Phones: the date gets its own line (it's cut off at a third of the width), start and minutes below -->
+      <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        <div class="col-span-2 sm:col-span-1"><label for="task-date" class="field-label">Date</label><input id="task-date" name="date" type="date" [(ngModel)]="draft.date" (ngModelChange)="timeChanged()" required class="glass-input w-full rounded-xl px-2 py-2.5 text-sm" /></div>
         <div><label for="task-start" class="field-label">Start</label><input id="task-start" name="startTime" type="time" [(ngModel)]="draft.startTime" (ngModelChange)="timeChanged()" required class="glass-input w-full rounded-xl px-2 py-2.5 text-sm" /></div>
         <div><label for="task-duration" class="field-label">Minutes</label><input id="task-duration" name="durationMinutes" type="number" [(ngModel)]="draft.durationMinutes" (ngModelChange)="timeChanged()" required min="5" max="600" class="glass-input w-full rounded-xl px-2 py-2.5 text-sm" /></div>
       </div>

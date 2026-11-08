@@ -37,25 +37,27 @@
       }
     </div>
   } @else {
-    <div class="mt-4 overflow-x-auto">
-      <table class="w-full min-w-[40rem] text-left text-sm">
+    <div class="relative mt-4 overflow-x-auto">
+      <!-- Phones: one column, each person a small card (ID, status, team access and buttons under
+           the name). From sm (640px) up: the full table. -->
+      <table class="w-full text-left text-sm sm:min-w-[40rem]">
         <thead class="border-b border-slate-200/80 text-xs uppercase tracking-wider text-slate-500">
           <tr>
             <th scope="col" class="px-3 py-3 font-semibold" [attr.aria-sort]="ariaSort('name')">
               <button type="button" class="inline-flex cursor-pointer items-center gap-1 uppercase hover:text-teal-900" (click)="sortBy('name')">Name @if (sortKey() === 'name') { <span aria-hidden="true">{{ sortAscending() ? '↑' : '↓' }}</span> }</button>
             </th>
             @if (isStudents()) {
-              <th scope="col" class="px-3 py-3 font-semibold" [attr.aria-sort]="ariaSort('studentId')">
+              <th scope="col" class="hidden px-3 py-3 font-semibold sm:table-cell" [attr.aria-sort]="ariaSort('studentId')">
                 <button type="button" class="inline-flex cursor-pointer items-center gap-1 uppercase hover:text-teal-900" (click)="sortBy('studentId')">Student ID @if (sortKey() === 'studentId') { <span aria-hidden="true">{{ sortAscending() ? '↑' : '↓' }}</span> }</button>
               </th>
             }
-            <th scope="col" class="px-3 py-3 font-semibold" [attr.aria-sort]="ariaSort('status')">
+            <th scope="col" class="hidden px-3 py-3 font-semibold sm:table-cell" [attr.aria-sort]="ariaSort('status')">
               <button type="button" class="inline-flex cursor-pointer items-center gap-1 uppercase hover:text-teal-900" (click)="sortBy('status')">Status @if (sortKey() === 'status') { <span aria-hidden="true">{{ sortAscending() ? '↑' : '↓' }}</span> }</button>
             </th>
             @if (isStudents()) {
-              <th scope="col" class="px-3 py-3 font-semibold" title="What they may do with tasks on their Team page">Team access</th>
+              <th scope="col" class="hidden px-3 py-3 font-semibold sm:table-cell" title="What they may do with tasks on their Team page">Team access</th>
             }
-            <th scope="col" class="px-3 py-3 text-right font-semibold">Actions</th>
+            <th scope="col" class="hidden px-3 py-3 text-right font-semibold sm:table-cell">Actions</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-200/60">
@@ -63,20 +65,29 @@
             <tr class="hover:bg-white/40">
               <td class="px-3 py-3">
                 <p class="font-medium text-slate-900">{{ account.firstName }} {{ account.lastName }} @if (isMe(account)) { <span class="font-normal text-slate-500">(you)</span> }</p>
-                <p class="text-slate-500">{{ account.email }}</p>
+                <p class="break-all text-slate-500">{{ account.email }}</p>
+                <div class="mt-2 space-y-2 sm:hidden">
+                  <p class="flex flex-wrap items-center gap-2 text-xs text-slate-600">
+                    @if (isStudents()) { <span class="font-mono" [class.text-amber-800]="account.studentId?.startsWith('MISSING')">{{ account.studentId }}</span> }
+                    <ng-container *ngTemplateOutlet="status; context: { $implicit: account }" />
+                  </p>
+                  @if (isStudents()) {
+                    <label class="flex items-center gap-2 text-xs text-slate-600">Team access
+                      <select class="glass-input rounded-xl px-2 py-1.5 text-sm" [disabled]="busyId() === account.id"
+                        [ngModel]="account.taskAccess ?? 'VIEW'" (ngModelChange)="setAccess(account, $event)">
+                        @for (level of accessLevels; track level) { <option [value]="level">{{ accessLabel[level] }}</option> }
+                      </select>
+                    </label>
+                  }
+                  <ng-container *ngTemplateOutlet="actions; context: { $implicit: account }" />
+                </div>
               </td>
               @if (isStudents()) {
-                <td class="px-3 py-3 font-mono text-slate-700" [class.text-amber-800]="account.studentId?.startsWith('MISSING')">{{ account.studentId }}</td>
+                <td class="hidden px-3 py-3 font-mono text-slate-700 sm:table-cell" [class.text-amber-800]="account.studentId?.startsWith('MISSING')">{{ account.studentId }}</td>
               }
-              <td class="px-3 py-3">
-                @switch (statusOf(account)) {
-                  @case ('active') { <span class="badge bg-teal-100 text-teal-900">Active</span> }
-                  @case ('no-password') { <span class="badge bg-amber-100 text-amber-900">Waiting for password</span> }
-                  @case ('disabled') { <span class="badge bg-slate-200 text-slate-700">Disabled</span> }
-                }
-              </td>
+              <td class="hidden px-3 py-3 sm:table-cell"><ng-container *ngTemplateOutlet="status; context: { $implicit: account }" /></td>
               @if (isStudents()) {
-                <td class="px-3 py-3">
+                <td class="hidden px-3 py-3 sm:table-cell">
                   <label class="sr-only" [for]="'access-' + account.id">What {{ account.firstName }} may do with tasks</label>
                   <select [id]="'access-' + account.id" class="glass-input rounded-xl px-2 py-1.5 text-sm" [disabled]="busyId() === account.id"
                     [ngModel]="account.taskAccess ?? 'VIEW'" (ngModelChange)="setAccess(account, $event)">
@@ -84,31 +95,8 @@
                   </select>
                 </td>
               }
-              <td class="px-3 py-3">
-                <div class="flex justify-end gap-0.5">
-                  <button type="button" class="icon-button" [attr.aria-label]="'Edit ' + account.firstName" title="Edit" [disabled]="busyId() === account.id" (click)="openEdit(account)">
-                    <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
-                  </button>
-                  @if (account.status === 'ACTIVE') {
-                    <button type="button" class="icon-button" [attr.aria-label]="'Email ' + account.firstName + ' a set-password link'" title="Send set-password link" [disabled]="busyId() === account.id" (click)="sendLink(account)">
-                      <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM22 6l-10 7L2 6" /></svg>
-                    </button>
-                  }
-                  @if (!isMe(account)) {
-                    @if (account.status === 'ACTIVE') {
-                      <button type="button" class="icon-button" [attr.aria-label]="'Disable ' + account.firstName" title="Disable" [disabled]="busyId() === account.id" (click)="disable(account)">
-                        <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9" /><path d="m5.6 5.6 12.8 12.8" /></svg>
-                      </button>
-                    } @else {
-                      <button type="button" class="icon-button" [attr.aria-label]="'Enable ' + account.firstName" title="Enable" [disabled]="busyId() === account.id" (click)="enable(account)">
-                        <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="m8 12 3 3 5-6" /></svg>
-                      </button>
-                    }
-                    <button type="button" class="icon-button hover:text-rose-800" [attr.aria-label]="'Remove ' + account.firstName" title="Remove" [disabled]="busyId() === account.id" (click)="remove(account)">
-                      <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /></svg>
-                    </button>
-                  }
-                </div>
+              <td class="hidden px-3 py-3 sm:table-cell">
+                <div class="flex justify-end"><ng-container *ngTemplateOutlet="actions; context: { $implicit: account }" /></div>
               </td>
             </tr>
           }
@@ -117,6 +105,41 @@
     </div>
   }
 </section>
+
+<!-- Shown in the table on wide screens and under each name on phones -->
+<ng-template #status let-account>
+  @switch (statusOf(account)) {
+    @case ('active') { <span class="badge bg-teal-100 text-teal-900">Active</span> }
+    @case ('no-password') { <span class="badge bg-amber-100 text-amber-900">Waiting for password</span> }
+    @case ('disabled') { <span class="badge bg-slate-200 text-slate-700">Disabled</span> }
+  }
+</ng-template>
+<ng-template #actions let-account>
+  <div class="flex gap-0.5">
+    <button type="button" class="icon-button" [attr.aria-label]="'Edit ' + account.firstName" title="Edit" [disabled]="busyId() === account.id" (click)="openEdit(account)">
+      <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
+    </button>
+    @if (account.status === 'ACTIVE') {
+      <button type="button" class="icon-button" [attr.aria-label]="'Email ' + account.firstName + ' a set-password link'" title="Send set-password link" [disabled]="busyId() === account.id" (click)="sendLink(account)">
+        <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM22 6l-10 7L2 6" /></svg>
+      </button>
+    }
+    @if (!isMe(account)) {
+      @if (account.status === 'ACTIVE') {
+        <button type="button" class="icon-button" [attr.aria-label]="'Disable ' + account.firstName" title="Disable" [disabled]="busyId() === account.id" (click)="disable(account)">
+          <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9" /><path d="m5.6 5.6 12.8 12.8" /></svg>
+        </button>
+      } @else {
+        <button type="button" class="icon-button" [attr.aria-label]="'Enable ' + account.firstName" title="Enable" [disabled]="busyId() === account.id" (click)="enable(account)">
+          <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="m8 12 3 3 5-6" /></svg>
+        </button>
+      }
+      <button type="button" class="icon-button hover:text-rose-800" [attr.aria-label]="'Remove ' + account.firstName" title="Remove" [disabled]="busyId() === account.id" (click)="remove(account)">
+        <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /></svg>
+      </button>
+    }
+  </div>
+</ng-template>
 
 <app-side-panel [open]="panelOpen()" [title]="editing() ? 'Edit ' + editing()!.firstName + ' ' + editing()!.lastName : (isStudents() ? 'Add a student' : 'Add an admin')" (closed)="panelOpen.set(false)">
   @if (panelOpen()) {

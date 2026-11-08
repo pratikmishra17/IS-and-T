@@ -85,10 +85,11 @@ public class ReservationService {
 
 	/**
 	 * The task was completed: deduct what was used from each room (recorded against the task and the
-	 * student) and mark each line fulfilled or backordered. Returns how many lines are backordered.
+	 * student; the stock history names the task by its title) and mark each line fulfilled or
+	 * backordered. Returns how many lines are backordered.
 	 */
 	@Transactional
-	public int fulfil(Long taskId, Map<Long, Integer> usedByPlannedItem, Student student) {
+	public int fulfil(Long taskId, String taskTitle, Map<Long, Integer> usedByPlannedItem, Student student) {
 		int backordered = 0;
 		for (PlannedItem line : planned.findByTask(taskId)) {
 			if (line.getStatus() != PlannedItemStatus.RESERVED) {
@@ -100,7 +101,7 @@ public class ReservationService {
 						+ line.getQuantityPlanned() + ".");
 			}
 			if (used > 0) {
-				stockService.deductForTask(line.getItem(), line.getLocation(), used, taskId, student);
+				stockService.deductForTask(line.getItem(), line.getLocation(), used, taskId, taskTitle, student);
 			}
 			line.fulfil(used);
 			if (line.getStatus() == PlannedItemStatus.BACKORDERED) {

@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, booleanAttribute, inject, input, signal } from '@angular/core';
+import { Component, OnInit, booleanAttribute, inject, input, signal } from '@angular/core';
 import { FormsModule, NgForm } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { LastPage } from '../../services/last-page';
@@ -12,23 +12,29 @@ import { errorMessage } from '../../services/errors';
   imports: [FormsModule, RouterLink],
   templateUrl: './login.html',
 })
-export class Login {
+export class Login implements OnInit {
   private readonly auth = inject(Auth);
   private readonly router = inject(Router);
   private readonly lastPage = inject(LastPage);
 
   /**
-   * The email typed so far. Kept for this browser tab (sessionStorage, never the password), so
-   * switching to the other portal's login page keeps it.
+   * The email typed so far, kept for this browser tab (sessionStorage, never the password). Each
+   * portal keeps its own, so a student's email doesn't turn up on the admin login. The one
+   * exception is "Go to the other portal" after the wrong one was used: then it carries over.
    */
-  protected typedEmail = readTypedEmail();
+  protected typedEmail = '';
+
+  ngOnInit(): void {
+    this.typedEmail = readEmail(this.portal()); // the portal input is only set by now, not when the fields are made
+  }
 
   protected rememberEmail(email: string): void {
-    try {
-      sessionStorage.setItem(EMAIL_KEY, email);
-    } catch {
-      // storage blocked: the other page just starts empty
-    }
+    saveEmail(this.portal(), email);
+  }
+
+  /** "Go to the other portal": the same person, so their email goes with them. */
+  protected carryEmailOver(): void {
+    saveEmail(this.portal() === 'admin' ? 'user' : 'admin', this.typedEmail);
   }
 
   /** Set by the route's data ({ portal: 'admin' } on /admin/login). */
@@ -73,12 +79,21 @@ export class Login {
   }
 }
 
-const EMAIL_KEY = 'isandt.loginEmail';
+type Portal = 'user' | 'admin';
+const emailKey = (portal: Portal) => `isandt.loginEmail.${portal}`;
 
-function readTypedEmail(): string {
+function readEmail(portal: Portal): string {
   try {
-    return sessionStorage.getItem(EMAIL_KEY) ?? '';
+    return sessionStorage.getItem(emailKey(portal)) ?? '';
   } catch {
     return '';
+  }
+}
+
+function saveEmail(portal: Portal, email: string): void {
+  try {
+    sessionStorage.setItem(emailKey(portal), email);
+  } catch {
+    // storage blocked: the page just starts empty next time
   }
 }

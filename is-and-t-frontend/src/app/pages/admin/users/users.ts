@@ -1,3 +1,4 @@
+import { NgTemplateOutlet } from '@angular/common';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule, NgForm } from '@angular/forms';
 import { Auth, User } from '../../../services/auth';
@@ -19,7 +20,7 @@ type SortKey = 'name' | 'studentId' | 'status';
  */
 @Component({
   selector: 'app-admin-users',
-  imports: [FormsModule, SidePanel],
+  imports: [FormsModule, NgTemplateOutlet, SidePanel],
   templateUrl: './users.html',
 })
 export class AdminUsers implements OnInit {

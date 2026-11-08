@@ -139,6 +139,24 @@ requests, 6 missing items. Rebuild it any day with `scripts/test-data/start.sh` 
 [scripts/test-data/README.md](../scripts/test-data/README.md)): dates are worked out from the day it
 runs, so it always covers today through the next 7 days.
 
+## Part 6: Phones and tablets (Nov 8, 2026)
+Every student and admin page, side panel and dialog at phone size (375 × 812) and tablet size
+(768 × 1024), with every change checked again on desktop (1440 × 900). A script also checked each page
+for anything sticking out past the screen edge.
+
+| # | Found | Fixed |
+|---|---|---|
+| R1 | Class times and preferred hours: every row's day showed "Monday", whatever was saved, so Save would have changed them all | The right day is selected (also on desktop); a test covers it |
+| R2 | Users page wider than a phone screen: a hidden screen-reader label escaped its scrolling box | Every sideways-scrolling box contains what's in it |
+| R3 | The task form's things-to-bring section grew wider than the panel after choosing a stock item | Forms' fieldsets shrink to fit |
+| R4 | Tables cut off on phones (Planner task list, Team tasks, Users, Semesters, Inventory items and rooms): status, who and buttons were off the screen | On phones (and tablets for inventory items) each row shows those under its name |
+| R5 | Day timeline and week board: names scrolled away with the hours, and the day always opened at 7 AM | Names stay pinned on the left; on a narrow screen the day opens at its first shift, or now |
+| R6 | Team page: on a phone it opened on the week board, and the title ended on Friday even when the weekend was shown | Opens on the Day view on phones, like the Planner; the title ends on the last day shown |
+| R7 | Time rows (class times, preferred hours, the Type tab of weekly shifts): the day was squeezed to a sliver | On phones the day gets its own line |
+| R8 | Small things: tab names broke over two lines, the task form's date was cut off, the dashboard's tiles took a whole screen, a stray divider | Fixed |
+| R9 | Inventory history said "Task #13" for stock a deployment used | It names the task: "Used for “Desk setup for Dr. Patel”"; V21 rewrites the old rows the same way |
+| R10 | The admin login showed the email last typed on the student login (and the other way round) | Each login page remembers its own; it only carries over through "Go to the other portal" after using the wrong one |
+
 ---
 
 ## Findings

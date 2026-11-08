@@ -52,15 +52,17 @@
         @if (shownItems().length === 0) {
           <p class="py-12 text-center text-sm text-slate-600">{{ items().length === 0 ? 'No items yet.' : 'No items match.' }}</p>
         } @else {
-          <div class="mt-4 overflow-x-auto">
-            <table class="w-full min-w-[46rem] text-left text-sm">
+          <div class="relative mt-4 overflow-x-auto">
+            <!-- Phones and tablets: one column, each item a small card (rooms, stock, status and buttons
+                 under its name). Wide screens (lg, 1024px): the full table. -->
+            <table class="w-full text-left text-sm lg:min-w-[46rem]">
               <thead class="border-b border-slate-200/80 text-xs uppercase tracking-wider text-slate-500">
                 <tr>
                   <th scope="col" class="px-3 py-3 font-semibold">Item</th>
-                  <th scope="col" class="px-3 py-3 font-semibold">Where</th>
-                  <th scope="col" class="px-3 py-3 text-right font-semibold">In stock</th>
-                  <th scope="col" class="px-3 py-3 font-semibold">Status</th>
-                  <th scope="col" class="px-3 py-3 text-right font-semibold">Actions</th>
+                  <th scope="col" class="hidden px-3 py-3 font-semibold lg:table-cell">Where</th>
+                  <th scope="col" class="hidden px-3 py-3 text-right font-semibold lg:table-cell">In stock</th>
+                  <th scope="col" class="hidden px-3 py-3 font-semibold lg:table-cell">Status</th>
+                  <th scope="col" class="hidden px-3 py-3 text-right font-semibold lg:table-cell">Actions</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-200/60">
@@ -70,44 +72,30 @@
                       <p class="font-medium text-slate-900">{{ item.name }}</p>
                       <p class="text-slate-500">{{ item.categoryName }}@if (item.manufacturer || item.model) { · {{ item.manufacturer }} {{ item.model }} }</p>
                       @for (detail of item.attributes | keyvalue; track detail.key) { <span class="mr-2 text-xs text-slate-500">{{ detail.key }}: {{ detail.value }}</span> }
+                      <div class="mt-2 space-y-2 lg:hidden">
+                        <div class="flex flex-wrap gap-1">
+                          @for (s of item.stock; track s.locationId) { <span class="badge bg-white/70 font-medium text-slate-700">{{ s.label }}: {{ s.quantity }}</span> }
+                        </div>
+                        <p class="flex flex-wrap items-center gap-2 text-slate-700">
+                          <span><span class="font-semibold text-slate-900">{{ item.onHand }}</span> in stock@if (item.reserved > 0) { · {{ item.available }} available }</span>
+                          <ng-container *ngTemplateOutlet="itemStatus; context: { $implicit: item }" />
+                        </p>
+                        <ng-container *ngTemplateOutlet="itemActions; context: { $implicit: item }" />
+                      </div>
                     </td>
-                    <td class="px-3 py-3">
+                    <td class="hidden px-3 py-3 lg:table-cell">
                       <div class="flex flex-wrap gap-1">
                         @for (s of item.stock; track s.locationId) { <span class="badge bg-white/70 font-medium text-slate-700">{{ s.label }}: {{ s.quantity }}</span> }
                         @if (item.stock.length === 0) { <span class="text-slate-400">—</span> }
                       </div>
                     </td>
-                    <td class="px-3 py-3 text-right">
+                    <td class="hidden px-3 py-3 text-right lg:table-cell">
                       <span class="text-base font-semibold text-slate-900">{{ item.onHand }}</span>
                       @if (item.reserved > 0) { <p class="text-xs text-slate-500">{{ item.available }} available</p> }
                     </td>
-                    <td class="px-3 py-3">
-                      @if (item.archived) { <span class="badge bg-slate-200 text-slate-700">Archived</span> }
-                      @else if (item.onHand === 0) { <span class="badge bg-rose-100 text-rose-900">Out of stock</span> }
-                      @else if (item.lowStock) { <span class="badge bg-amber-100 text-amber-900">Low (≤ {{ item.lowStockThreshold }})</span> }
-                      @else { <span class="badge bg-teal-100 text-teal-900">OK</span> }
-                    </td>
-                    <td class="px-3 py-3">
-                      <div class="flex justify-end gap-0.5">
-                        @if (!item.archived) {
-                          <button type="button" class="btn btn-quiet px-3 py-1.5 text-xs" [disabled]="locations().length === 0" (click)="openStock(item)">Adjust stock</button>
-                        }
-                        <button type="button" class="icon-button" [attr.aria-label]="'History of ' + item.name" title="History" (click)="openHistory(item)">
-                          <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5M12 7v5l3 2" /></svg>
-                        </button>
-                        <button type="button" class="icon-button" [attr.aria-label]="'Edit ' + item.name" title="Edit" (click)="openEditItem(item)">
-                          <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
-                        </button>
-                        <button type="button" class="icon-button" [attr.aria-label]="(item.archived ? 'Restore ' : 'Archive ') + item.name" [title]="item.archived ? 'Restore' : 'Archive'" [disabled]="busyId() === item.id" (click)="archiveItem(item)">
-                          <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4" /></svg>
-                        </button>
-                        <!-- Greyed out with the reason when it can't work (a disabled button shows no tooltip, so the span carries it) -->
-                        <span class="inline-flex" [title]="item.hasHistory ? 'Has stock or task history, so it can’t be deleted. Archive it instead.' : 'Delete'">
-                        <button type="button" class="icon-button hover:text-rose-800 disabled:opacity-40" [attr.aria-label]="'Delete ' + item.name + (item.hasHistory ? ' (not possible: it has history; archive it instead)' : '')" [disabled]="busyId() === item.id || item.hasHistory" (click)="deleteItem(item)">
-                          <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /></svg>
-                        </button>
-                        </span>
-                      </div>
+                    <td class="hidden px-3 py-3 lg:table-cell"><ng-container *ngTemplateOutlet="itemStatus; context: { $implicit: item }" /></td>
+                    <td class="hidden px-3 py-3 lg:table-cell">
+                      <div class="flex justify-end"><ng-container *ngTemplateOutlet="itemActions; context: { $implicit: item }" /></div>
                     </td>
                   </tr>
                 }
@@ -122,12 +110,13 @@
         @if (locations().length === 0) {
           <p class="py-12 text-center text-sm text-slate-600">No storage rooms yet. Add each room where stock is kept.</p>
         } @else {
-          <div class="overflow-x-auto">
-            <table class="w-full min-w-[32rem] text-left text-sm">
+          <div class="relative overflow-x-auto">
+            <!-- Phones: the description goes under the room's name -->
+            <table class="w-full text-left text-sm sm:min-w-[32rem]">
               <thead class="border-b border-slate-200/80 text-xs uppercase tracking-wider text-slate-500">
                 <tr>
                   <th scope="col" class="px-3 py-3 font-semibold">Room</th>
-                  <th scope="col" class="px-3 py-3 font-semibold">Description</th>
+                  <th scope="col" class="hidden px-3 py-3 font-semibold sm:table-cell">Description</th>
                   <th scope="col" class="px-3 py-3 text-right font-semibold">Units stored</th>
                   <th scope="col" class="px-3 py-3 text-right font-semibold">Actions</th>
                 </tr>
@@ -135,8 +124,10 @@
               <tbody class="divide-y divide-slate-200/60">
                 @for (room of locations(); track room.id) {
                   <tr class="hover:bg-white/40">
-                    <td class="px-3 py-3 font-medium text-slate-900">{{ room.label }}</td>
-                    <td class="px-3 py-3 text-slate-600">{{ room.description || '—' }}</td>
+                    <td class="px-3 py-3 font-medium text-slate-900">{{ room.label }}
+                      @if (room.description) { <span class="block text-xs font-normal text-slate-500 sm:hidden">{{ room.description }}</span> }
+                    </td>
+                    <td class="hidden px-3 py-3 text-slate-600 sm:table-cell">{{ room.description || '—' }}</td>
                     <td class="px-3 py-3 text-right text-slate-700">{{ room.unitsStored }}</td>
                     <td class="px-3 py-3">
                       <div class="flex justify-end gap-0.5">
@@ -251,7 +242,7 @@
       <div>
         <label for="item-form-threshold" class="field-label">Low stock at or below</label>
         <input id="item-form-threshold" name="lowStockThreshold" type="number" [(ngModel)]="itemDraft.lowStockThreshold" #threshold="ngModel" required min="0" max="100000" class="glass-input w-32 rounded-xl px-3 py-2.5 text-sm" [attr.aria-invalid]="threshold.invalid && (threshold.touched || itemForm.submitted)" />
-        <p class="mt-1 text-xs text-slate-500">Counted across all rooms together. Low items show on the dashboard and in the 8am email.</p>
+        <p class="mt-1 text-xs text-slate-500">Counted across all rooms together. Low items show on the dashboard and in the daily email.</p>
       </div>
       <fieldset>
         <legend class="field-label">Extra details <span class="font-normal text-slate-500">(optional, e.g. Size: 24 in)</span></legend>
@@ -401,3 +392,33 @@
     </form>
   }
 </app-side-panel>
+
+<!-- An item's status badge and buttons: in the table on wide screens, under the item's name on phones and tablets -->
+<ng-template #itemStatus let-item>
+  @if (item.archived) { <span class="badge bg-slate-200 text-slate-700">Archived</span> }
+  @else if (item.onHand === 0) { <span class="badge bg-rose-100 text-rose-900">Out of stock</span> }
+  @else if (item.lowStock) { <span class="badge bg-amber-100 text-amber-900">Low (≤ {{ item.lowStockThreshold }})</span> }
+  @else { <span class="badge bg-teal-100 text-teal-900">OK</span> }
+</ng-template>
+<ng-template #itemActions let-item>
+  <div class="flex flex-wrap items-center gap-0.5">
+    @if (!item.archived) {
+      <button type="button" class="btn btn-quiet px-3 py-1.5 text-xs" [disabled]="locations().length === 0" (click)="openStock(item)">Adjust stock</button>
+    }
+    <button type="button" class="icon-button" [attr.aria-label]="'History of ' + item.name" title="History" (click)="openHistory(item)">
+      <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5M12 7v5l3 2" /></svg>
+    </button>
+    <button type="button" class="icon-button" [attr.aria-label]="'Edit ' + item.name" title="Edit" (click)="openEditItem(item)">
+      <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
+    </button>
+    <button type="button" class="icon-button" [attr.aria-label]="(item.archived ? 'Restore ' : 'Archive ') + item.name" [title]="item.archived ? 'Restore' : 'Archive'" [disabled]="busyId() === item.id" (click)="archiveItem(item)">
+      <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4" /></svg>
+    </button>
+    <!-- Greyed out with the reason when it can't work (a disabled button shows no tooltip, so the span carries it) -->
+    <span class="inline-flex" [title]="item.hasHistory ? 'Has stock or task history, so it can’t be deleted. Archive it instead.' : 'Delete'">
+    <button type="button" class="icon-button hover:text-rose-800 disabled:opacity-40" [attr.aria-label]="'Delete ' + item.name + (item.hasHistory ? ' (not possible: it has history; archive it instead)' : '')" [disabled]="busyId() === item.id || item.hasHistory" (click)="deleteItem(item)">
+      <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /></svg>
+    </button>
+    </span>
+  </div>
+</ng-template>

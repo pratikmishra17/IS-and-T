@@ -146,6 +146,11 @@ export class AdminPlanner implements OnInit {
     this.timeOff().length + this.requests().length + this.changes().length + this.offers().length);
   protected readonly listed = computed(() => this.tasks().filter((t) => this.statusFilter() === 'all' || t.status === this.statusFilter()));
 
+  /** The colours of a task's status badge. */
+  protected statusTone(task: Task): string {
+    return task.status === 'UNASSIGNED' ? 'bg-amber-100 text-amber-900' : task.status === 'COMPLETED' ? 'bg-teal-100 text-teal-900' : 'bg-slate-200 text-slate-700';
+  }
+
   async ngOnInit(): Promise<void> {
     // A link (?view=…&date=…) wins; otherwise the remembered view and date are used, and shown in the address.
     const params = this.route.snapshot.queryParamMap;

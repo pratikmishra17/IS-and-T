@@ -1,5 +1,5 @@
 import { NgTemplateOutlet } from '@angular/common';
-import { Component, OnDestroy, computed, input, output, signal } from '@angular/core';
+import { Component, ElementRef, OnDestroy, afterRenderEffect, computed, input, output, signal, viewChild } from '@angular/core';
 import { Week, clock, minutes } from '../../services/schedule';
 import { STATUS_LABEL, Task, taskTone } from '../../services/tasks';
 import { TaskDrag, TaskDrop } from '../task-dnd';
@@ -57,11 +57,12 @@ export interface NewTaskAt {
 @Component({
   selector: 'app-day-timeline',
   template: `
-    <div class="overflow-x-auto">
-      <div class="min-w-[60rem]">
+    <!-- isolate: the pinned names column (tl-name) stacks inside this box, never over the page's bars -->
+    <div #scroller class="relative isolate overflow-x-auto">
+      <div class="min-w-[44rem] sm:min-w-[60rem]">
         <!-- The hours -->
-        <div class="grid grid-cols-[11rem_1fr] border-b border-slate-200/70">
-          <div></div>
+        <div class="grid grid-cols-[7rem_1fr] sm:grid-cols-[11rem_1fr] border-b border-slate-200/70">
+          <div class="tl-name"></div>
           <div class="relative h-8" aria-hidden="true">
             @for (hour of hourMarks(); track hour) {
               <span class="absolute bottom-1.5 -translate-x-1/2 text-[0.7rem] font-medium tabular-nums text-slate-500" [style.left.%]="x(hour)">{{ hourLabel(hour) }}</span>
@@ -70,8 +71,8 @@ export interface NewTaskAt {
         </div>
 
         <!-- Tasks nobody has yet -->
-        <div class="grid grid-cols-[11rem_1fr] border-b border-slate-200/60" [appTaskDrop]="null" (taskDropped)="moveTask.emit({ task: $event, student: null })">
-          <div class="bg-amber-50/50 px-3 py-2.5">
+        <div class="grid grid-cols-[7rem_1fr] sm:grid-cols-[11rem_1fr] border-b border-slate-200/60" [appTaskDrop]="null" (taskDropped)="moveTask.emit({ task: $event, student: null })">
+          <div class="tl-name tint-amber bg-amber-50/50 px-3 py-2.5">
             <p class="font-semibold text-amber-950">Unassigned</p>
             <p class="text-xs text-amber-800">{{ unassigned().length }} {{ unassigned().length === 1 ? 'task needs' : 'tasks need' }} someone</p>
           </div>
@@ -90,9 +91,9 @@ export interface NewTaskAt {
         }
 
         @for (row of rows(); track row.student.studentId) {
-          <div class="grid grid-cols-[11rem_1fr] border-b border-slate-200/60 last:border-b-0" [class.bg-teal-50/50]="isMe(row.student)"
+          <div class="grid grid-cols-[7rem_1fr] sm:grid-cols-[11rem_1fr] border-b border-slate-200/60 last:border-b-0" [class.bg-teal-50/50]="isMe(row.student)"
             [appTaskDrop]="row.student.studentId" (taskDropped)="moveTask.emit({ task: $event, student: row.student })">
-            <div class="px-3 py-2.5">
+            <div class="tl-name px-3 py-2.5" [class.tint-teal]="isMe(row.student)">
               <p class="truncate font-semibold text-slate-900">{{ row.student.name }} @if (isMe(row.student)) { <span class="badge badge-solid ml-1">You</span> }</p>
               <p class="text-xs text-slate-500">
                 @if (row.cancelled) { Day off }
@@ -102,7 +103,7 @@ export interface NewTaskAt {
               @if (canEditSchedules()) {
                 <button type="button" class="btn btn-quiet mt-1.5 px-2 py-0.5 text-xs" [attr.aria-label]="'Edit ' + row.student.name + '’s schedule'" (click)="editSchedule.emit(row.student)">
                   <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></svg>
-                  Edit schedule
+                  <span class="hidden sm:inline">Edit schedule</span>
                 </button>
               }
             </div>
@@ -254,6 +255,46 @@ export class DayTimeline implements OnDestroy {
     }
     return marks;
   });
+
+  /**
+   * Where a narrow screen (a phone, a tablet) should start looking, as minutes into the day: on
+   * today, an hour before now (or the next shift or task, if that's later); on other days, the
+   * first shift or task. Null when the day is empty.
+   */
+  private readonly startAt = computed(() => {
+    const starts = [
+      ...this.dayTasks().map((task) => minutes(task.startTime)),
+      ...this.rows().flatMap((row) => row.shifts.map((s) => minutes(s.start))),
+    ];
+    const first = starts.length ? Math.min(...starts) : null;
+    if (this.isToday()) {
+      const upcoming = starts.filter((at) => at >= this.now());
+      return upcoming.length && Math.min(...upcoming) - this.now() > 60 ? Math.min(...upcoming) : this.now() - 60;
+    }
+    return first;
+  });
+  private readonly scroller = viewChild<ElementRef<HTMLElement>>('scroller');
+  private scrolledFor: string | null = null;
+
+  constructor() {
+    // When the hours don't all fit, scroll them so the day's first shift or task (or now) is in
+    // view, half an hour early. Once per date, so it never fights someone scrolling by hand.
+    afterRenderEffect(() => {
+      const box = this.scroller()?.nativeElement;
+      const at = this.startAt();
+      if (!box || at === null || this.scrolledFor === this.date()) {
+        return;
+      }
+      this.scrolledFor = this.date();
+      // Everything fits (the last hour's label always pokes out a few pixels; that isn't scrolling)
+      if (box.scrollWidth - box.clientWidth < 40) {
+        return;
+      }
+      const names = box.querySelector<HTMLElement>('.tl-name')?.offsetWidth ?? 0;
+      const hours = box.scrollWidth - names;
+      box.scrollLeft = Math.max(0, (Math.max(0, this.x(at - 30)) / 100) * hours);
+    });
+  }
 
   ngOnDestroy(): void {
     clearInterval(this.timer);

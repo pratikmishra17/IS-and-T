@@ -138,7 +138,7 @@ public class StudentTaskService {
 	@Transactional
 	public TaskResponse complete(Long taskId, Long studentId, OutcomeRequest request) {
 		Task task = mine(taskId, studentId);
-		int backordered = reservations.fulfil(taskId, request.used() == null ? Map.of() : request.used(), task.getAssignee());
+		int backordered = reservations.fulfil(taskId, task.getTitle(), request.used() == null ? Map.of() : request.used(), task.getAssignee());
 		task.complete(request.notes());
 		workflow.record(task, TaskEventType.COMPLETED, TaskWorkflow.name(task.getAssignee()),
 				backordered == 0 ? null : backordered + (backordered == 1 ? " item" : " items") + " backordered");

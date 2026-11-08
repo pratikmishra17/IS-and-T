@@ -13,7 +13,7 @@ import {
 } from '../../services/team';
 import { addDays, mondayOf } from '../../ui/month-picker';
 import { ChangeAt, DayTimeline, NewTaskAt } from '../../ui/planner/day-timeline';
-import { ChangeOn, NewTaskOn, WeekBoard } from '../../ui/planner/week-board';
+import { ChangeOn, NewTaskOn, WeekBoard, busyWeekendDays } from '../../ui/planner/week-board';
 import { ChangeRequestPanel } from '../../ui/change-request';
 import { MyRequests } from '../../ui/my-requests';
 import { SidePanel } from '../../ui/side-panel';
@@ -114,10 +114,21 @@ export class Team implements OnInit {
       return new Date(`${this.date()}T12:00:00`).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
     }
     const start = new Date(`${this.weekStart()}T12:00:00`);
-    const end = new Date(`${addDays(this.weekStart(), 4)}T12:00:00`);
+    const end = new Date(`${addDays(this.weekStart(), this.lastShownDay())}T12:00:00`);
     const month = (date: Date) => date.toLocaleDateString('en-US', { month: 'short' });
     return `${month(start)} ${start.getDate()} – ${start.getMonth() === end.getMonth() ? end.getDate() : month(end) + ' ' + end.getDate()}, ${end.getFullYear()}`;
   });
+  /** The week board shows Monday–Friday plus any weekend day with something on it; the title ends on the last one. */
+  private readonly lastShownDay = computed(() => {
+    const week = this.week();
+    const busy = week ? busyWeekendDays(week, this.tasks()) : new Set<string>();
+    return busy.has(addDays(this.weekStart(), 6)) ? 6 : busy.has(addDays(this.weekStart(), 5)) ? 5 : 4;
+  });
+
+  /** The colours of a task's status badge. */
+  protected statusTone(task: Task): string {
+    return task.status === 'UNASSIGNED' ? 'bg-amber-100 text-amber-900' : task.status === 'COMPLETED' ? 'bg-teal-100 text-teal-900' : 'bg-slate-200 text-slate-700';
+  }
 
   protected readonly pendingRequests = computed(() =>
     this.offers().filter((o) => o.status === 'PENDING').length + this.changesPending());
@@ -138,6 +149,9 @@ export class Team implements OnInit {
   });
 
   async ngOnInit(): Promise<void> {
+    if (this.view() === 'week' && window.matchMedia?.('(max-width: 639px)').matches) {
+      this.view.set('day'); // a phone: the week board only fits one day at a time anyway (as on the Planner)
+    }
     try {
       const [access, semesters] = await Promise.all([this.api.access(), this.scheduleApi.semesters()]);
       this.access.set(access);

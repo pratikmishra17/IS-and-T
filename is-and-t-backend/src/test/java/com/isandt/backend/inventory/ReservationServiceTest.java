@@ -35,12 +35,12 @@ class ReservationServiceTest {
 		PlannedItem twoMonitors = line(7L, 2);
 		when(planned.findByTask(5L)).thenReturn(List.of(twoMonitors));
 
-		int backordered = service.fulfil(5L, Map.of(7L, 1), null);
+		int backordered = service.fulfil(5L, "Desk setup", Map.of(7L, 1), null);
 
 		assertThat(backordered).isEqualTo(1);
 		assertThat(twoMonitors.getStatus()).isEqualTo(PlannedItemStatus.BACKORDERED);
 		assertThat(twoMonitors.missing()).isEqualTo(1);
-		verify(stockService).deductForTask(monitor, room, 1, 5L, null);
+		verify(stockService).deductForTask(monitor, room, 1, 5L, "Desk setup", null);
 	}
 
 	@Test
@@ -48,18 +48,18 @@ class ReservationServiceTest {
 		PlannedItem twoMonitors = line(7L, 2);
 		when(planned.findByTask(5L)).thenReturn(List.of(twoMonitors));
 
-		service.fulfil(5L, Map.of(), null);
+		service.fulfil(5L, "Desk setup", Map.of(), null);
 
 		assertThat(twoMonitors.getStatus()).isEqualTo(PlannedItemStatus.FULFILLED);
-		verify(stockService).deductForTask(monitor, room, 2, 5L, null);
+		verify(stockService).deductForTask(monitor, room, 2, 5L, "Desk setup", null);
 	}
 
 	@Test
 	void usingMoreThanPlannedIsRefused() {
 		when(planned.findByTask(5L)).thenReturn(List.of(line(7L, 2)));
 
-		assertThatThrownBy(() -> service.fulfil(5L, Map.of(7L, 3), null)).isInstanceOf(ConflictException.class);
-		verify(stockService, never()).deductForTask(any(), any(), anyInt(), any(), any());
+		assertThatThrownBy(() -> service.fulfil(5L, "Desk setup", Map.of(7L, 3), null)).isInstanceOf(ConflictException.class);
+		verify(stockService, never()).deductForTask(any(), any(), anyInt(), any(), any(), any());
 	}
 
 	private PlannedItem line(Long id, int quantity) {

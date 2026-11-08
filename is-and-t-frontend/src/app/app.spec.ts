@@ -543,6 +543,34 @@ describe('App routing', () => {
     expect(page).toBeTruthy();
   });
 
+  it('keeps each login page’s typed email to itself, but carries it over to the other portal when sent there', async () => {
+    const harness = await RouterTestingHarness.create('/login');
+    const emailBox = () => harness.routeNativeElement!.querySelector<HTMLInputElement>('#login-email')!;
+    const typeInto = (input: HTMLInputElement, value: string) => {
+      input.value = value;
+      input.dispatchEvent(new Event('input'));
+    };
+    typeInto(emailBox(), 'ada@example.com');
+    await harness.navigateByUrl('/admin/login');
+    await harness.fixture.whenStable();
+    expect(emailBox().value).toBe(''); // a student's email doesn't turn up on the admin login
+
+    await harness.navigateByUrl('/login');
+    await harness.fixture.whenStable();
+    expect(emailBox().value).toBe('ada@example.com');
+
+    // Wrong portal: the link to the other one takes the email along
+    typeInto(harness.routeNativeElement!.querySelector<HTMLInputElement>('#login-password')!, 'secret');
+    harness.routeNativeElement!.querySelector('form')!.dispatchEvent(new Event('submit'));
+    http.expectOne('/api/auth/login').flush({ detail: 'This is the student portal.' }, { status: 403, statusText: 'Forbidden' });
+    await harness.fixture.whenStable();
+    harness.fixture.detectChanges();
+    [...harness.routeNativeElement!.querySelectorAll('a')].find((a) => a.textContent?.includes('admin portal'))!.click();
+    await harness.fixture.whenStable();
+    expect(TestBed.inject(Router).url).toBe('/admin/login');
+    expect(emailBox().value).toBe('ada@example.com');
+  });
+
   it('creates a task with just a title and location, picking and typing things to bring, left unassigned', async () => {
     const harness = await openPlanner('/admin/planner?view=list');
     const page = harness.fixture.nativeElement as HTMLElement;

@@ -183,7 +183,7 @@ public class TeamTaskService {
 			detail = "For " + TaskWorkflow.name(task.getAssignee());
 		}
 		if (done) {
-			int backordered = reservations.fulfil(taskId, request.used() == null ? Map.of() : request.used(), task.getAssignee());
+			int backordered = reservations.fulfil(taskId, task.getTitle(), request.used() == null ? Map.of() : request.used(), task.getAssignee());
 			task.complete(request.notes());
 			workflow.record(task, TaskEventType.COMPLETED, TaskWorkflow.name(me),
 					detail + (backordered == 0 ? "" : "; " + backordered + (backordered == 1 ? " item" : " items") + " backordered"));

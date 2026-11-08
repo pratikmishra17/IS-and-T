@@ -32,11 +32,12 @@ export interface ChangeOn extends ChangeAt {
   selector: 'app-week-board',
   imports: [DatePipe, NgTemplateOutlet, TimeDrag, TaskDrag, TaskDrop],
   template: `
-    <div class="overflow-x-auto">
-      <table class="w-full table-fixed border-separate border-spacing-1 text-left text-sm" [style.min-width.rem]="days().length * 10 + 11">
+    <!-- isolate: the pinned Student column (tl-name) stacks inside this box, never over the page's bars -->
+    <div class="relative isolate overflow-x-auto">
+      <table class="week-board w-full table-fixed border-separate border-spacing-1 text-left text-sm" [style.--board-days]="days().length">
         <thead>
           <tr>
-            <th scope="col" class="w-44 px-2 py-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Student</th>
+            <th scope="col" class="tl-name w-28 px-2 py-2 text-xs sm:w-44 font-semibold uppercase tracking-wider text-slate-500">Student</th>
             @for (day of days(); track day.date) {
               <th scope="col" class="rounded-xl px-1 py-1 align-top" [class.bg-teal-100]="highlighted(day.date)">
                 <button type="button" class="block w-full rounded-lg px-1.5 py-1 text-left" [attr.aria-label]="'Open ' + (day.date | date: 'EEEE MMMM d') + ' in the day view'" title="Open this day" (click)="openDay.emit(day.date)">
@@ -58,7 +59,7 @@ export interface ChangeOn extends ChangeAt {
         <tbody>
           <!-- Tasks nobody has yet (drop a task here to take it off someone) -->
           <tr [appTaskDrop]="null" (taskDropped)="moveTask.emit({ task: $event, student: null })">
-            <th scope="row" class="rounded-xl bg-amber-50/70 px-3 py-2.5 align-top">
+            <th scope="row" class="tl-name tint-amber rounded-xl bg-amber-50/70 px-3 py-2.5 align-top">
               <span class="block font-semibold text-amber-950">Unassigned</span>
               <span class="block text-xs text-amber-800">{{ unassigned().length }} {{ unassigned().length === 1 ? 'task needs' : 'tasks need' }} someone</span>
             </th>
@@ -84,7 +85,7 @@ export interface ChangeOn extends ChangeAt {
           @for (student of week().students; track student.studentId) {
             <!-- Drop a task anywhere on someone's row to give it to them -->
             <tr [appTaskDrop]="student.studentId" (taskDropped)="moveTask.emit({ task: $event, student })">
-              <th scope="row" class="rounded-xl px-3 py-2.5 align-top" [class.bg-white/40]="!isMe(student)" [class.bg-teal-50/80]="isMe(student)">
+              <th scope="row" class="tl-name rounded-xl px-3 py-2.5 align-top" [class.bg-white/40]="!isMe(student)" [class.bg-teal-50/80]="isMe(student)" [class.tint-teal]="isMe(student)">
                 <span class="block truncate font-semibold text-slate-900">{{ student.name }}</span>
                 @if (isMe(student)) { <span class="badge badge-solid mt-0.5">You</span> }
                 <span class="block text-xs" [class.text-rose-800]="student.overLimit" [class.font-semibold]="student.overLimit" [class.text-slate-500]="!student.overLimit">
@@ -93,7 +94,7 @@ export interface ChangeOn extends ChangeAt {
                 @if (canEditSchedules()) {
                   <button type="button" class="btn btn-quiet mt-2 px-2.5 py-1 text-xs" [attr.aria-label]="'Edit ' + student.name + '’s schedule'" (click)="editSchedule.emit(student)">
                     <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></svg>
-                    Edit schedule
+                    <span class="hidden sm:inline">Edit schedule</span>
                   </button>
                 }
               </th>
