@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.isandt.backend.activity.Activity;
 import com.isandt.backend.auth.AuthenticatedUser;
 import com.isandt.backend.common.web.Saved;
 
@@ -30,6 +31,7 @@ public class TimeOffController {
 		this.service = service;
 	}
 
+	@Activity("Asked for time off")
 	@PostMapping("/api/me/time-off")
 	@ResponseStatus(HttpStatus.CREATED)
 	TimeOffResponse request(@Valid @RequestBody TimeOffBody body, @AuthenticationPrincipal AuthenticatedUser me) {
@@ -41,6 +43,7 @@ public class TimeOffController {
 		return service.mine(me.getId());
 	}
 
+	@Activity("Withdrew a time-off request")
 	@PostMapping("/api/me/time-off/{id}/withdraw")
 	TimeOffResponse withdraw(@PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser me) {
 		return service.withdraw(id, me.getId());
@@ -56,12 +59,14 @@ public class TimeOffController {
 		return Map.of("pending", service.pendingCount());
 	}
 
+	@Activity("Approved time off")
 	@PostMapping("/api/admin/time-off/{id}/approve")
 	Saved<TimeOffResponse> approve(@PathVariable Long id, @Valid @RequestBody(required = false) ReviewBody body,
 			@AuthenticationPrincipal AuthenticatedUser admin) {
 		return service.approve(id, admin.getId(), body);
 	}
 
+	@Activity("Declined time off")
 	@PostMapping("/api/admin/time-off/{id}/decline")
 	TimeOffResponse decline(@PathVariable Long id, @Valid @RequestBody(required = false) ReviewBody body,
 			@AuthenticationPrincipal AuthenticatedUser admin) {

@@ -44,6 +44,10 @@ class DailyDigestTest {
 
 	private final EmailSender sender = mock(EmailSender.class);
 
+	private final com.isandt.backend.timeoff.TimeOffService timeOff = mock(com.isandt.backend.timeoff.TimeOffService.class);
+
+	private final com.isandt.backend.schedule.ShiftChangeService changes = mock(com.isandt.backend.schedule.ShiftChangeService.class);
+
 	private final Admin ada = new Admin("ada@example.com", "Ada", "Admin", null);
 
 	@BeforeEach
@@ -54,7 +58,7 @@ class DailyDigestTest {
 		when(tasks.list(any(), any(), any())).thenReturn(List.of());
 		when(tasks.backorders()).thenReturn(List.of());
 		when(items.list()).thenReturn(List.of(new ItemResponse(1L, 1L, "Cables", "HDMI cable", null, null, TrackingType.COUNT, 5,
-				Map.of(), false, 2, 0, 2, true, List.of())));
+				Map.of(), false, 2, 0, 2, true, List.of(), true)));
 	}
 
 	@Test
@@ -76,6 +80,7 @@ class DailyDigestTest {
 		verify(sender).send(email.capture());
 		assertThat(email.getValue().to()).isEqualTo("ada@example.com");
 		assertThat(email.getValue().body()).contains("HDMI cable: 2 left");
+		assertThat(email.getValue().body()).contains("Unassigned in the next 4 days:\n  None.");
 		verify(settings).markDigestSent(WEDNESDAY);
 	}
 
@@ -88,9 +93,21 @@ class DailyDigestTest {
 		verify(sender, times(0)).send(any());
 	}
 
+	@Test
+	void itListsWhatIsWaitingForAnAnswer() {
+		when(timeOff.pendingCount()).thenReturn(2L);
+		when(changes.pendingCount()).thenReturn(1L);
+
+		String body = digestAt("08:00").compose(WEDNESDAY);
+
+		assertThat(body).contains("  • 2 time-off requests\n  • 1 shift change");
+		assertThat(body).doesNotContain("All clear");
+	}
+
 	private DailyDigest digestAt(String time) {
 		Clock clock = Clock.fixed(WEDNESDAY.atTime(LocalTime.parse(time)).atZone(CLEVELAND).toInstant(), CLEVELAND);
-		return new DailyDigest(settings, tasks, items, admins, sender, "http://localhost:4200", clock);
+		return new DailyDigest(settings, tasks, items, admins, sender, "http://localhost:4200", clock, timeOff, changes,
+				mock(com.isandt.backend.task.TeamTaskService.class), mock(com.isandt.backend.schedule.AdminScheduleService.class));
 	}
 
 }

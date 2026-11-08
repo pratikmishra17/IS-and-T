@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.isandt.backend.activity.Activity;
 import com.isandt.backend.auth.AuthenticatedUser;
 import com.isandt.backend.calendar.SemesterResponse;
 import com.isandt.backend.schedule.ScheduleResponses.StudentSchedule;
@@ -38,12 +39,14 @@ public class MyScheduleController {
 		return service.get(me.getId(), semesterId);
 	}
 
+	@Activity("Saved their class times and preferred hours")
 	@PutMapping("/availability")
 	StudentSchedule saveAvailability(@RequestParam Long semesterId, @Valid @RequestBody AvailabilityRequest request,
 			@AuthenticationPrincipal AuthenticatedUser me) {
 		return service.saveAvailability(me.getId(), semesterId, request);
 	}
 
+	@Activity("Sent their preferred hours for approval")
 	@PostMapping("/submit")
 	StudentSchedule submit(@RequestParam Long semesterId, @AuthenticationPrincipal AuthenticatedUser me) {
 		return service.submit(me.getId(), semesterId);

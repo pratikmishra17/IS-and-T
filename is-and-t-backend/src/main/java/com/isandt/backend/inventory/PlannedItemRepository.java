@@ -23,4 +23,11 @@ interface PlannedItemRepository extends JpaRepository<PlannedItem, Long> {
 
 	boolean existsByLocation(StorageLocation location);
 
+	/** Items and rooms a task has used or planned (they can't be deleted). */
+	@Query("select distinct p.item.id from PlannedItem p")
+	java.util.Set<Long> itemIdsUsed();
+
+	@Query("select distinct p.location.id from PlannedItem p")
+	java.util.Set<Long> locationIdsUsed();
+
 }

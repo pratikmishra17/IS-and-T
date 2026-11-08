@@ -4,9 +4,11 @@ import java.time.Clock;
 import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -21,6 +23,7 @@ import com.isandt.backend.inventory.ItemService;
 import com.isandt.backend.portal.PortalResponses.MyDay;
 import com.isandt.backend.portal.PortalResponses.MyWeek;
 import com.isandt.backend.portal.PortalResponses.MyWeekDay;
+import com.isandt.backend.portal.PortalResponses.NextShift;
 import com.isandt.backend.portal.PortalResponses.ShiftView;
 import com.isandt.backend.portal.PortalResponses.StockLookup;
 import com.isandt.backend.portal.PortalResponses.WeekHours;
@@ -28,6 +31,7 @@ import com.isandt.backend.schedule.ShiftCalendar;
 import com.isandt.backend.schedule.StudentScheduleService;
 import com.isandt.backend.task.StudentTaskService;
 import com.isandt.backend.task.TaskResponses.TaskResponse;
+import com.isandt.backend.task.TaskStatus;
 
 /**
  * The student's Home and My week pages. This package only combines what the schedule, task and
@@ -35,6 +39,9 @@ import com.isandt.backend.task.TaskResponses.TaskResponse;
  */
 @Service
 public class MyPortalService {
+
+	/** How far ahead "next up" looks. */
+	private static final int LOOK_AHEAD_DAYS = 14;
 
 	private final ShiftCalendar shifts;
 
@@ -65,20 +72,40 @@ public class MyPortalService {
 	public MyDay today(Long studentId) {
 		LocalDate today = LocalDate.now(clock);
 		MyWeek week = week(studentId, today);
-		MyWeekDay day = week.days().stream().filter(d -> d.date().equals(today)).findFirst()
-				.orElseGet(() -> weekendDay(studentId, today));
+		MyWeekDay day = week.days().stream().filter(d -> d.date().equals(today)).findFirst().orElseThrow();
 		Optional<Semester> semester = semesters.containing(today);
 		long upForGrabs = tasks.myTasks(studentId).available().stream().filter(task -> task.date().equals(today)).count();
+		var schedule = semester.map(s -> schedules.get(studentId, s.getId()));
 		return new MyDay(today, day.holiday(), day.dayOff(), day.shifts(), day.tasks(), (int) upForGrabs, week.hours(),
-				week.weeklyHourLimit(), week.semesterName(),
-				semester.map(s -> schedules.get(studentId, s.getId()).request()).orElse(null));
+				week.weeklyHourLimit(), week.semesterName(), schedule.map(s -> s.request()).orElse(null),
+				nextShift(studentId, today), nextTask(studentId, today), schedule.map(s -> !s.shifts().isEmpty()).orElse(false));
 	}
 
-	/** Monday to Friday of the week containing the given day (this week if null). */
+	/** The next shift that hasn't ended yet, looking two weeks ahead. */
+	private NextShift nextShift(Long studentId, LocalDate today) {
+		LocalTime now = LocalTime.now(clock);
+		Map<LocalDate, ShiftCalendar.Day> ahead = shifts.between(List.of(studentId), today, today.plusDays(LOOK_AHEAD_DAYS)).get(studentId);
+		return ahead.entrySet().stream().sorted(Map.Entry.comparingByKey())
+				.flatMap(entry -> entry.getValue().shifts().stream()
+						.filter(shift -> entry.getKey().isAfter(today) || shift.end().isAfter(now))
+						.map(shift -> new NextShift(entry.getKey(), shift.start(), shift.end(), shift.extra())))
+				.findFirst().orElse(null);
+	}
+
+	/** The next of their tasks that hasn't ended yet, looking two weeks ahead. */
+	private TaskResponse nextTask(Long studentId, LocalDate today) {
+		LocalTime now = LocalTime.now(clock);
+		return tasks.tasksBetween(studentId, today, today.plusDays(LOOK_AHEAD_DAYS)).stream()
+				.filter(task -> task.status() == TaskStatus.ASSIGNED && (task.date().isAfter(today) || task.endTime().isAfter(now)))
+				.min(Comparator.comparing(TaskResponse::date).thenComparing(TaskResponse::startTime))
+				.orElse(null);
+	}
+
+	/** Monday to Sunday of the week containing the given day (this week if null). */
 	@Transactional(readOnly = true)
 	public MyWeek week(Long studentId, LocalDate anyDay) {
 		LocalDate monday = (anyDay == null ? LocalDate.now(clock) : anyDay).with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
-		LocalDate friday = monday.plusDays(4);
+		LocalDate friday = monday.plusDays(6); // weekends can have extra shifts and tasks
 		Map<LocalDate, ShiftCalendar.Day> days = shifts.between(List.of(studentId), monday, friday).get(studentId);
 		Map<LocalDate, String> holidayNames = holidays.namesBetween(monday, friday);
 		List<TaskResponse> weekTasks = tasks.tasksBetween(studentId, monday, friday);
@@ -122,11 +149,6 @@ public class MyPortalService {
 						item.attributes(), item.available(),
 						item.stock().stream().map(s -> new StockLookup.Room(s.label(), s.quantity())).toList()))
 				.toList();
-	}
-
-	private MyWeekDay weekendDay(Long studentId, LocalDate date) {
-		return new MyWeekDay(date, holidays.namesBetween(date, date).get(date), false, List.of(), List.of(),
-				tasks.tasksBetween(studentId, date, date));
 	}
 
 	private static List<ShiftView> views(ShiftCalendar.Day day) {

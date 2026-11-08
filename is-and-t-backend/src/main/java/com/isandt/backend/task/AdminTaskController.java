@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.isandt.backend.activity.Activity;
 import com.isandt.backend.auth.AuthenticatedUser;
 import com.isandt.backend.common.web.Saved;
 import com.isandt.backend.task.TaskResponses.Backorder;
@@ -49,18 +50,21 @@ public class AdminTaskController {
 		return service.detail(id);
 	}
 
+	@Activity("Created a task")
 	@PostMapping
 	@ResponseStatus(HttpStatus.CREATED)
 	Saved<TaskResponse> create(@Valid @RequestBody TaskRequest request, @AuthenticationPrincipal AuthenticatedUser admin) {
 		return service.create(request, admin.getId());
 	}
 
+	@Activity("Changed a task")
 	@PutMapping("/{id}")
 	Saved<TaskResponse> update(@PathVariable Long id, @Valid @RequestBody TaskRequest request,
 			@AuthenticationPrincipal AuthenticatedUser admin) {
 		return service.update(id, request, admin.getId());
 	}
 
+	@Activity("Cancelled a task")
 	@PostMapping("/{id}/cancel")
 	TaskResponse cancel(@PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser admin) {
 		return service.cancel(id, admin.getId());
@@ -78,6 +82,7 @@ public class AdminTaskController {
 		return service.candidates(id);
 	}
 
+	@Activity("Assigned a task")
 	@PostMapping("/{id}/assign")
 	Saved<TaskResponse> assign(@PathVariable Long id, @RequestBody AssignRequest request,
 			@AuthenticationPrincipal AuthenticatedUser admin) {

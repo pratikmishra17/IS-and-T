@@ -52,6 +52,9 @@
             <th scope="col" class="px-3 py-3 font-semibold" [attr.aria-sort]="ariaSort('status')">
               <button type="button" class="inline-flex cursor-pointer items-center gap-1 uppercase hover:text-teal-900" (click)="sortBy('status')">Status @if (sortKey() === 'status') { <span aria-hidden="true">{{ sortAscending() ? '↑' : '↓' }}</span> }</button>
             </th>
+            @if (isStudents()) {
+              <th scope="col" class="px-3 py-3 font-semibold" title="What they may do with tasks on their Team page">Team access</th>
+            }
             <th scope="col" class="px-3 py-3 text-right font-semibold">Actions</th>
           </tr>
         </thead>
@@ -72,6 +75,15 @@
                   @case ('disabled') { <span class="badge bg-slate-200 text-slate-700">Disabled</span> }
                 }
               </td>
+              @if (isStudents()) {
+                <td class="px-3 py-3">
+                  <label class="sr-only" [for]="'access-' + account.id">What {{ account.firstName }} may do with tasks</label>
+                  <select [id]="'access-' + account.id" class="glass-input rounded-xl px-2 py-1.5 text-sm" [disabled]="busyId() === account.id"
+                    [ngModel]="account.taskAccess ?? 'VIEW'" (ngModelChange)="setAccess(account, $event)">
+                    @for (level of accessLevels; track level) { <option [value]="level">{{ accessLabel[level] }}</option> }
+                  </select>
+                </td>
+              }
               <td class="px-3 py-3">
                 <div class="flex justify-end gap-0.5">
                   <button type="button" class="icon-button" [attr.aria-label]="'Edit ' + account.firstName" title="Edit" [disabled]="busyId() === account.id" (click)="openEdit(account)">
@@ -108,7 +120,7 @@
 
 <app-side-panel [open]="panelOpen()" [title]="editing() ? 'Edit ' + editing()!.firstName + ' ' + editing()!.lastName : (isStudents() ? 'Add a student' : 'Add an admin')" (closed)="panelOpen.set(false)">
   @if (panelOpen()) {
-    <form #accountForm="ngForm" (ngSubmit)="save(accountForm)" class="space-y-5" novalidate>
+    <form #accountForm="ngForm" (input)="formError.set(null)" (change)="formError.set(null)" (ngSubmit)="save(accountForm)" class="space-y-5" novalidate>
       @if (!editing()) {
         <p class="text-sm leading-6 text-slate-600">They’ll get an email from the IS&amp;T portal with a link to set their password{{ isStudents() ? '' : ' and log in to the admin portal' }}.</p>
       }

@@ -49,6 +49,14 @@ public final class ScheduleResponses {
 
 	}
 
+	/**
+	 * What deleting a semester also deletes: students with weekly shifts (and how many shifts), students
+	 * who entered class times or hours, hours requests and shift changes.
+	 */
+	public record SemesterUsage(long studentsWithShifts, long weeklyShifts, long studentsWithAvailability, long hoursRequests,
+			long shiftChanges) {
+	}
+
 	/** The team week view: Monday to Friday, every active student. */
 	public record Week(LocalDate start, List<WeekDay> days, List<StudentWeek> students, Integer weeklyHourLimit,
 			String semesterName) {

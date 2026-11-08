@@ -180,9 +180,13 @@ public class Task {
 		return startAt.plus(Duration.ofMinutes(durationMinutes));
 	}
 
-	/** Shares at least one minute with the other task. */
+	/**
+	 * Shares at least one minute with the other task. The other task is read through its getter, not
+	 * its field: it may be a Hibernate stand-in (a lazy proxy, e.g. the task of an offer), whose fields
+	 * stay empty until a method loads it.
+	 */
 	boolean overlaps(Task other) {
-		return startAt.isBefore(other.endAt()) && other.startAt.isBefore(endAt());
+		return startAt.isBefore(other.endAt()) && other.getStartAt().isBefore(endAt());
 	}
 
 	LocalDate date(ZoneId zone) {

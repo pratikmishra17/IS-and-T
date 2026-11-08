@@ -5,11 +5,13 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -110,6 +112,41 @@ class TaskAssigner {
 			return new Availability(student, problem);
 		}).toList();
 		return all.stream().sorted(Comparator.comparing((Availability a) -> a.problem() != null)).toList();
+	}
+
+	/**
+	 * Why this student isn't a good pick for the task, as a sentence for the admin ("Sam isn't working
+	 * on Wed, Nov 11."), or null if they are. Same checks as availability(), in the same order.
+	 */
+	String whyNot(Student student, Task task) {
+		String first = student.getFirstName();
+		LocalDate date = task.date(zone);
+		LocalTime start = task.startTime(zone);
+		LocalTime end = task.endTime(zone);
+		String day = date.format(DateTimeFormatter.ofPattern("EEE, MMM d", Locale.US));
+		if (!student.isActive()) {
+			return first + "'s account is disabled, so they can't log in to see this task.";
+		}
+		if (student.getPasswordHash() == null) {
+			return first + " hasn't set a password yet, so they can't log in to see this task. Resend their link from Users.";
+		}
+		if (!task.endsSameDay(zone)) {
+			return null; // the date warnings already say a task past midnight can't be covered
+		}
+		List<ShiftCalendar.Shift> shiftsThatDay = shifts.on(student.getId(), date).shifts();
+		if (shiftsThatDay.isEmpty()) {
+			return first + " isn't working on " + day + ".";
+		}
+		if (shiftsThatDay.stream().noneMatch(shift -> !shift.start().isAfter(start) && !shift.end().isBefore(end))) {
+			String worked = shiftsThatDay.stream().map(shift -> shift.start() + "–" + shift.end()).collect(Collectors.joining(", "));
+			return first + " works " + worked + " that day, which doesn't cover the whole task (" + start + "–" + end + ").";
+		}
+		return tasks.findStartingBetween(date.atStartOfDay(zone).toInstant(), date.plusDays(1).atStartOfDay(zone).toInstant()).stream()
+				.filter(other -> !other.getId().equals(task.getId()) && other.getStatus() == TaskStatus.ASSIGNED
+						&& other.getAssignee() != null && other.getAssignee().getId().equals(student.getId()) && other.overlaps(task))
+				.findFirst()
+				.map(other -> first + " already has \"" + other.getTitle() + "\" then (" + other.startTime(zone) + "–" + other.endTime(zone) + ").")
+				.orElse(null);
 	}
 
 	boolean isOnShiftForWholeTask(Student student, Task task) {

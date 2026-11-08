@@ -8,7 +8,7 @@
     <div role="tablist" aria-label="Schedule" class="mt-6 inline-flex gap-1 rounded-2xl border border-white/60 bg-white/30 p-1">
       <button type="button" role="tab" class="rounded-xl px-4 py-2 text-sm font-medium text-slate-700 hover:bg-white/60" [class.bg-white]="tab() === 'week'" [class.shadow-sm]="tab() === 'week'" [attr.aria-selected]="tab() === 'week'" (click)="tab.set('week')">My week</button>
       <button type="button" role="tab" class="rounded-xl px-4 py-2 text-sm font-medium text-slate-700 hover:bg-white/60" [class.bg-white]="tab() === 'hours'" [class.shadow-sm]="tab() === 'hours'" [attr.aria-selected]="tab() === 'hours'" (click)="tab.set('hours')">My hours</button>
-      <button type="button" role="tab" class="rounded-xl px-4 py-2 text-sm font-medium text-slate-700 hover:bg-white/60" [class.bg-white]="tab() === 'timeoff'" [class.shadow-sm]="tab() === 'timeoff'" [attr.aria-selected]="tab() === 'timeoff'" (click)="tab.set('timeoff')">Time off</button>
+      <button type="button" role="tab" class="rounded-xl px-4 py-2 text-sm font-medium text-slate-700 hover:bg-white/60" [class.bg-white]="tab() === 'timeoff'" [class.shadow-sm]="tab() === 'timeoff'" [attr.aria-selected]="tab() === 'timeoff'" (click)="tab.set('timeoff')">My requests</button>
     </div>
   }
 
@@ -27,7 +27,7 @@
         </div>
       </div>
       <ul class="mt-4 space-y-2">
-        @for (day of w.days; track day.date) {
+        @for (day of shownDays(w); track day.date) {
           <li class="rounded-2xl border p-3" [class]="day.date === today ? 'border-teal-300 bg-teal-50/70' : 'border-white/70 bg-white/40'">
             <div class="flex flex-wrap items-center gap-2">
               <span class="font-semibold text-slate-900">{{ day.date | date: 'EEEE' }}</span>
@@ -74,65 +74,14 @@
     </div>
   } @else if (tab() === 'timeoff') {
     <div class="mt-6">
-      <h2 class="font-semibold text-slate-900">Ask for time off</h2>
-      <p class="mt-1 text-sm text-slate-600">An admin approves it. Any of your tasks in that time go to someone else who’s working then.</p>
-      <div class="mt-4 space-y-4 rounded-2xl border border-white/70 bg-white/40 p-4">
+      <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <label for="off-date" class="field-label">Date</label>
-          <input id="off-date" type="date" class="glass-input w-full rounded-xl px-3 py-2.5 text-sm sm:w-56" [min]="today" [ngModel]="timeOffDraft.date" (ngModelChange)="timeOffDateChanged($event)" />
+          <h2 class="font-semibold text-slate-900">Changes to when you work</h2>
+          <p class="mt-1 text-sm text-slate-600">Time off, or different hours on a day or every week. An admin approves each one.</p>
         </div>
-        <fieldset>
-          <legend class="field-label">How much?</legend>
-          <div class="grid grid-cols-3 gap-2">
-            @for (option of [{ id: 'day', label: 'Whole day' }, { id: 'shift', label: 'One shift' }, { id: 'hours', label: 'Some hours' }]; track option.id) {
-              <label class="flex cursor-pointer items-center justify-center rounded-xl border px-2 py-2 text-center text-sm font-medium" [class]="timeOffDraft.kind === option.id ? 'border-teal-700 bg-teal-50 text-teal-950' : 'border-white/80 bg-white/50 text-slate-700'">
-                <input type="radio" name="off-kind" class="sr-only" [value]="option.id" [(ngModel)]="timeOffDraft.kind" />{{ option.label }}
-              </label>
-            }
-          </div>
-        </fieldset>
-        @if (timeOffDraft.kind === 'shift') {
-          <div>
-            <label for="off-shift" class="field-label">Which shift</label>
-            @if (shiftsOnDate().length === 0) {
-              <p id="off-shift" class="text-sm text-slate-500">{{ timeOffDraft.date ? 'You have no shifts that day.' : 'Choose a date first.' }}</p>
-            } @else {
-              <select id="off-shift" class="glass-input w-full rounded-xl px-3 py-2.5 text-sm" [(ngModel)]="timeOffDraft.shift">
-                @for (shift of shiftsOnDate(); track shift.start) { <option [value]="shift.start + '-' + shift.end">{{ shift.start }}–{{ shift.end }}</option> }
-              </select>
-            }
-          </div>
-        }
-        @if (timeOffDraft.kind === 'hours') {
-          <div class="grid grid-cols-2 gap-2 sm:w-72">
-            <div><label for="off-start" class="field-label">From</label><input id="off-start" type="time" class="glass-input w-full rounded-xl px-3 py-2.5 text-sm" [(ngModel)]="timeOffDraft.start" /></div>
-            <div><label for="off-end" class="field-label">To</label><input id="off-end" type="time" class="glass-input w-full rounded-xl px-3 py-2.5 text-sm" [(ngModel)]="timeOffDraft.end" /></div>
-          </div>
-        }
-        <div>
-          <label for="off-reason" class="field-label">Reason <span class="font-normal text-slate-500">(optional)</span></label>
-          <input id="off-reason" maxlength="500" placeholder="Exam, doctor’s appointment…" class="glass-input w-full rounded-xl px-3 py-2.5 text-sm" [(ngModel)]="timeOffDraft.reason" />
-        </div>
-        @if (timeOffError()) { <p role="alert" class="rounded-2xl bg-rose-50/90 px-4 py-3 text-sm text-rose-900">{{ timeOffError() }}</p> }
-        <button type="button" class="btn submit-button w-full text-white sm:w-auto" [disabled]="sendingTimeOff()" (click)="requestTimeOff()">{{ sendingTimeOff() ? 'Sending…' : 'Send request' }}</button>
+        <button type="button" class="btn submit-button text-white" (click)="changePanel().open(today)">Ask for a change</button>
       </div>
-
-      <h2 class="mt-8 text-sm font-semibold uppercase tracking-widest text-slate-500">Your requests</h2>
-      @if (myTimeOff().length === 0) { <p class="mt-2 text-sm text-slate-600">None yet.</p> }
-      <ul class="mt-2 divide-y divide-slate-200/70">
-        @for (request of myTimeOff(); track request.id) {
-          <li class="flex flex-wrap items-center justify-between gap-2 py-2.5 text-sm">
-            <div>
-              <p class="font-medium text-slate-800">{{ request.date | date: 'EEE, MMM d' }} · {{ window(request) }}</p>
-              @if (request.reviewNote) { <p class="text-slate-500">“{{ request.reviewNote }}”</p> }
-            </div>
-            <div class="flex items-center gap-2">
-              <span class="badge" [class]="request.status === 'APPROVED' ? 'bg-teal-100 text-teal-900' : request.status === 'PENDING' ? 'bg-amber-100 text-amber-900' : 'bg-slate-200 text-slate-700'">{{ request.status === 'PENDING' ? 'Waiting' : (request.status.charAt(0) + request.status.slice(1).toLowerCase()) }}</span>
-              @if (request.status === 'PENDING') { <button type="button" class="text-sm font-medium text-teal-900 hover:underline" (click)="withdrawTimeOff(request)">Withdraw</button> }
-            </div>
-          </li>
-        }
-      </ul>
+      <app-my-requests #myRequests />
     </div>
   } @else if (semesters().length === 0) {
     <p class="mt-4 text-sm leading-6 text-slate-600">There’s no current or upcoming semester yet. Check back once an admin has added one.</p>
@@ -174,7 +123,7 @@
       @if (s.exceptions.length > 0) {
         <ul class="mt-2 space-y-1 text-sm text-slate-600">
           @for (change of s.exceptions; track change.id) {
-            <li>{{ change.date | date: 'EEE, MMM d' }}: {{ change.type === 'CANCEL' ? 'day off' : 'extra shift ' + change.start + '–' + change.end }}@if (change.reason) { ({{ change.reason }}) }</li>
+            <li>{{ change.date | date: 'EEE, MMM d' }}: {{ change.type === 'CANCEL' ? 'day off' : (change.type === 'OFF' ? 'off ' : 'extra shift ') + change.start + '–' + change.end }}@if (change.reason) { ({{ change.reason }}) }</li>
           }
         </ul>
       }
@@ -219,3 +168,5 @@
   }
   @if (error() && semesters().length === 0) { <p role="alert" class="mt-6 rounded-2xl bg-rose-50/80 px-4 py-3 text-sm text-rose-900">{{ error() }}</p> }
 </section>
+
+<app-change-request (sent)="myRequests()?.reload()" />

@@ -19,7 +19,7 @@ class ItemResponseTest {
 		StockLevel second = new StockLevel(monitor, new StorageLocation(new LocationRequest("BU", "201", null)));
 		second.change(2);
 
-		ItemResponse response = ItemResponse.from(monitor, List.of(first, second), 0);
+		ItemResponse response = ItemResponse.from(monitor, List.of(first, second), 0, false);
 
 		assertThat(response.onHand()).isEqualTo(5);
 		assertThat(response.lowStock()).isTrue();

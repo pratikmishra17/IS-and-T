@@ -1,25 +1,25 @@
-import { Component, inject, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { Component, OnInit, inject } from '@angular/core';
+import { Router } from '@angular/router';
 import { Auth } from '../../services/auth';
-import { errorMessage } from '../../services/errors';
 
+/**
+ * /logout (and /admin/logout's old links): logs you out straight away and opens your portal's login
+ * page, which says you're logged out. The avatar menus log out directly; this is for bookmarks and
+ * typed addresses.
+ */
 @Component({
   selector: 'app-logout',
-  imports: [RouterLink],
-  templateUrl: './logout.html',
+  template: `<p class="py-12 text-center text-sm text-slate-600" role="status">Logging you out…</p>`,
 })
-export class Logout {
-  protected readonly auth = inject(Auth);
-  protected readonly loggedOut = signal(false);
-  protected readonly error = signal<string | null>(null);
+export class Logout implements OnInit {
+  private readonly auth = inject(Auth);
+  private readonly router = inject(Router);
 
-  protected async logout(): Promise<void> {
-    this.error.set(null);
-    try {
-      await this.auth.logout();
-      this.loggedOut.set(true);
-    } catch (error) {
-      this.error.set(errorMessage(error));
+  async ngOnInit(): Promise<void> {
+    const admin = this.auth.isAdmin();
+    if (this.auth.isLoggedIn()) {
+      await this.auth.endSession(); // never fails: if the server already ended it, it's just forgotten here
     }
+    await this.router.navigate([admin ? '/admin/login' : '/login'], { queryParams: { ended: 'out' }, replaceUrl: true });
   }
 }

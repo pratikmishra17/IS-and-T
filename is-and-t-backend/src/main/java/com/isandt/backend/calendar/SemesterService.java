@@ -8,6 +8,8 @@ import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.isandt.backend.common.text.Dates;
+import com.isandt.backend.activity.ActivityLog;
 import com.isandt.backend.common.error.ConflictException;
 import com.isandt.backend.common.error.NotFoundException;
 
@@ -88,7 +90,9 @@ public class SemesterService {
 
 	@Transactional
 	public void delete(Long id) {
-		semesters.delete(find(id));
+		Semester semester = find(id);
+		ActivityLog.about(semester.getName());
+		semesters.delete(semester);
 	}
 
 	/** The checks shared by create and update; "editing" is skipped when looking for overlaps. */
@@ -102,7 +106,7 @@ public class SemesterService {
 				.findFirst()
 				.ifPresent(other -> {
 					throw new ConflictException("These dates overlap " + other.getName() + " ("
-							+ other.getStartDate() + " to " + other.getEndDate() + ").");
+							+ Dates.dayWithYear(other.getStartDate()) + " to " + Dates.dayWithYear(other.getEndDate()) + ").");
 				});
 	}
 

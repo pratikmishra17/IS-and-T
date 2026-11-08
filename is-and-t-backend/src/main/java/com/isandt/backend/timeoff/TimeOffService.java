@@ -79,9 +79,6 @@ public class TimeOffService {
 		if (date.isBefore(LocalDate.now(clock))) {
 			throw new ConflictException("Time off can't be in the past.");
 		}
-		if (date.getDayOfWeek() == DayOfWeek.SATURDAY || date.getDayOfWeek() == DayOfWeek.SUNDAY) {
-			throw new ConflictException("There are no shifts at weekends.");
-		}
 		if ((body.start() == null) != (body.end() == null)) {
 			throw new ConflictException("Give both a start and an end time, or neither for the whole day.");
 		}

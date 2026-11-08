@@ -20,11 +20,22 @@ public final class PortalResponses {
 	}
 
 	/** Today at a glance. weeklyHourLimit/semesterName are null outside a semester; request is null if never submitted. */
+	/**
+	 * nextShift / nextTask: the next ones still to come (today or within two weeks), for "next up" when
+	 * today is empty (a weekend, say). shiftsSet: an admin has set weekly shifts this semester, so not
+	 * having submitted hours doesn't matter.
+	 */
 	public record MyDay(LocalDate date, String holiday, boolean dayOff, List<ShiftView> shifts, List<TaskResponse> tasks,
-			int upForGrabsToday, double weekHours, Integer weeklyHourLimit, String semesterName, RequestInfo request) {
+			int upForGrabsToday, double weekHours, Integer weeklyHourLimit, String semesterName, RequestInfo request,
+			NextShift nextShift, TaskResponse nextTask, boolean shiftsSet) {
 	}
 
-	/** Monday to Friday of one week. */
+	/** A shift on a given date. */
+	public record NextShift(LocalDate date, @JsonFormat(pattern = "HH:mm") LocalTime start,
+			@JsonFormat(pattern = "HH:mm") LocalTime end, boolean extra) {
+	}
+
+	/** Monday to Sunday of one week. */
 	public record MyWeek(LocalDate start, List<MyWeekDay> days, double hours, Integer weeklyHourLimit, String semesterName) {
 	}
 

@@ -2,6 +2,8 @@ package com.isandt.backend.user;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 
 /** A student worker. Logs in at the user portal (/login). Added by an admin. */
@@ -15,6 +17,11 @@ public class Student extends Account {
 
 	/** The secret in this student's calendar link; null until they ask for one. */
 	private String calendarToken;
+
+	/** What they may do with the team's tasks on the Team page; an admin changes it. */
+	@Enumerated(EnumType.STRING)
+	@Column(name = "task_access", nullable = false)
+	private TaskAccess taskAccess = TaskAccess.VIEW;
 
 	protected Student() {
 	}
@@ -43,6 +50,14 @@ public class Student extends Account {
 
 	public String getStudentId() {
 		return studentId;
+	}
+
+	public TaskAccess getTaskAccess() {
+		return taskAccess;
+	}
+
+	public void changeTaskAccess(TaskAccess taskAccess) {
+		this.taskAccess = taskAccess;
 	}
 
 }

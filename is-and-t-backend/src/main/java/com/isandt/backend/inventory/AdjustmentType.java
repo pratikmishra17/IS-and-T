@@ -6,5 +6,7 @@ public enum AdjustmentType {
 	/** Take this many out. */
 	REMOVE,
 	/** The room now has exactly this many (after a physical count). */
-	SET
+	SET,
+	/** Move this many from the room to another room (toLocationId). */
+	MOVE
 }

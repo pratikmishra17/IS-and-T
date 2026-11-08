@@ -13,12 +13,20 @@
     <!-- Next up -->
     @if (nextTask(); as task) {
       <a routerLink="/tasks" class="glass-panel mt-5 block rounded-3xl p-5 hover:bg-white/70">
-        <p class="text-xs font-semibold uppercase tracking-widest text-teal-800">Next up · {{ startsIn(task) }}</p>
+        <p class="text-xs font-semibold uppercase tracking-widest text-teal-800">Next up · {{ task.date === day()!.date ? startsIn(task) : whenOn(task.date) }}</p>
         <p class="mt-1 text-lg font-semibold text-slate-900">{{ task.title }}</p>
         <p class="text-sm text-slate-600">{{ task.startTime }}–{{ task.endTime }} · {{ task.location }}@if (task.employee.name) { · {{ task.employee.name }} }</p>
         @if (task.items.length > 0) {
           <p class="mt-2 text-sm text-slate-700">Pick up: @for (item of task.items; track item.id) { {{ item.quantityPlanned }} × {{ item.itemName }} ({{ item.locationLabel }})@if (!$last) {, } }</p>
         }
+      </a>
+    }
+
+    @if (nextShift(); as shift) {
+      <a routerLink="/schedule" class="glass-panel mt-4 block rounded-3xl p-5 hover:bg-white/70">
+        <p class="text-xs font-semibold uppercase tracking-widest text-teal-800">Your next shift</p>
+        <p class="mt-1 text-lg font-semibold text-slate-900">{{ whenOn(shift.date) | titlecase }}, {{ shift.start }}–{{ shift.end }}</p>
+        @if (shift.extra) { <p class="text-sm text-slate-600">An extra shift</p> }
       </a>
     }
 
@@ -68,7 +76,8 @@
           <a routerLink="/schedule" class="glass-panel block rounded-3xl p-5 hover:bg-white/70">
             <h2 class="font-semibold text-slate-900">Your hours</h2>
             <p class="mt-1 text-sm text-slate-600">
-              @if (!day()!.request) { Not submitted for {{ day()!.semesterName }} yet → }
+              @if (!day()!.request && day()!.shiftsSet) { Your {{ day()!.semesterName }} shifts are set. }
+              @else if (!day()!.request) { Not submitted for {{ day()!.semesterName }} yet → }
               @else if (day()!.request!.status === 'SUBMITTED') { Waiting for approval. }
               @else { Approved{{ day()!.request!.status === 'APPROVED_WITH_CHANGES' ? ' with changes' : '' }}. }
             </p>

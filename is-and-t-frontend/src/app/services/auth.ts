@@ -17,6 +17,10 @@ export interface User {
   /** False until the user opens their "you've been added" link and sets a password. */
   passwordSet: boolean;
   createdAt: string;
+  /** Students only: what they may do with the team's tasks (null for admins). */
+  taskAccess?: 'VIEW' | 'COMPLETE' | 'EDIT' | null;
+  /** What opens after logging in: the portal's home page, or the page they were on last. */
+  afterLogin?: 'HOME' | 'LAST_PAGE';
 }
 
 /** Matches SessionResponse in the backend: who is logged in, and the rules for this login. */
@@ -31,7 +35,7 @@ export interface Session {
 }
 
 /** Why someone was signed out without asking, shown on the login page (?ended=...). */
-export type EndReason = 'idle' | 'max' | 'ended';
+export type EndReason = 'idle' | 'max' | 'ended' | 'out';
 
 /** If the backend answered this recently, the session is known to be alive (see verify()). */
 const RECENT_MS = 10_000;
@@ -45,6 +49,9 @@ const LOGOUT_KEY = 'isandt.logout';
  * this service keeps a copy of it for the UI to read. The backend decides: this copy is checked
  * against it before pages open (verify) and corrected whenever the backend says otherwise.
  */
+/** A set-password link: still works, already used, past its time, or not a real link. */
+export type LinkState = 'VALID' | 'USED' | 'EXPIRED' | 'INVALID';
+
 @Injectable({ providedIn: 'root' })
 export class Auth {
   private readonly http = inject(HttpClient);
@@ -155,10 +162,26 @@ export class Auth {
     this.state.update((session) => (session ? { ...session, user } : session));
   }
 
+  /** My account: what opens after logging in. */
+  async setAfterLogin(afterLogin: 'HOME' | 'LAST_PAGE'): Promise<void> {
+    const user = await firstValueFrom(this.http.put<User>('/api/account/after-login', { afterLogin }));
+    this.state.update((session) => (session ? { ...session, user } : session));
+  }
+
   /** Other sessions of this account end; this one continues, now without the "must change" flag. */
   async changePassword(currentPassword: string, newPassword: string): Promise<void> {
     await firstValueFrom(this.http.post('/api/account/password', { currentPassword, newPassword }));
     this.state.update((session) => (session ? { ...session, mustChangePassword: false } : session));
+  }
+
+  /** Whether a set-password or reset link still works, so the page can say so before a password is typed. */
+  async checkLink(token: string): Promise<LinkState> {
+    return (await firstValueFrom(this.http.post<{ state: LinkState }>('/api/auth/password-link/check', { token }))).state;
+  }
+
+  /** "Send me a new one": a fresh link goes to the email of the account behind a used or expired link. */
+  async renewLink(token: string): Promise<void> {
+    await firstValueFrom(this.http.post('/api/auth/password-link/renew', { token }));
   }
 
   async forgotPassword(email: string): Promise<void> {

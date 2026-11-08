@@ -73,6 +73,23 @@ class TaskAssignerTest {
 	}
 
 	@Test
+	void whyNotSaysExactlyWhatStopsSomeoneTakingATask() {
+		Task bensTask = task(10L, "10:00", 60);
+		bensTask.assignTo(ben, false);
+		when(tasks.findStartingBetween(any(), any())).thenReturn(List.of(bensTask));
+		when(shifts.on(any(), any())).thenAnswer(call -> shifts.between(List.of(call.<Long>getArgument(0)), MONDAY, MONDAY)
+				.get(call.<Long>getArgument(0)).get(MONDAY));
+		Task later = task(11L, "09:30", 60);
+
+		assertThat(assigner.whyNot(cat, later)).isEqualTo("Cat works 09:00–10:00 that day, which doesn't cover the whole task (09:30–10:30).");
+		assertThat(assigner.whyNot(ben, later)).startsWith("Ben already has \"").endsWith("then (10:00–11:00).");
+		assertThat(assigner.whyNot(ann, later)).isNull();
+		Student dee = new Student("dee@example.com", "Dee", "Student", "S4", null); // no password yet
+		ReflectionTestUtils.setField(dee, "id", 4L);
+		assertThat(assigner.whyNot(dee, later)).contains("hasn't set a password yet");
+	}
+
+	@Test
 	void excludedStudentsAreLeftOut() {
 		when(tasks.findStartingBetween(any(), any())).thenReturn(List.of());
 

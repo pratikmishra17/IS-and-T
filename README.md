@@ -98,6 +98,12 @@ Open <http://localhost:4200/admin/login> and log in with your dev admin:
 From the admin portal you can add students and other admins; each gets a link to set their own
 password. Students log in at <http://localhost:4200/login>.
 
+The team's weekly shifts are filled in for you: at each startup, every student listed in
+`is-and-t-backend/src/main/resources/dev-data/weekly-shifts.csv` (found by first name) who has no
+shifts yet in the current semester gets the ones in that file. Students who already have shifts are
+left alone, and the backend console says who was filled in, skipped or not found. This needs a
+semester that includes today (Calendar page).
+
 ---
 
 ## Day-to-day
@@ -107,6 +113,7 @@ password. Students log in at <http://localhost:4200/login>.
 | Backend tests | `cd is-and-t-backend && ./mvnw test -Dtest='!IsAndTBackendApplicationTests'` |
 | Frontend tests | `cd is-and-t-frontend && npm test -- --watch=false` |
 | Production build of the frontend | `cd is-and-t-frontend && npm run build` |
+| A separate test copy full of sample data, on <http://localhost:4100> | `scripts/test-data/start.sh` (stop with `scripts/test-data/stop.sh`; see [scripts/test-data/README.md](scripts/test-data/README.md)) |
 | Restart the backend after a change | Eclipse: restart from the dashboard. Or touch the DevTools trigger file: `date > is-and-t-backend/target/classes/.reloadtrigger` |
 
 (`IsAndTBackendApplicationTests` starts the whole app and needs the database, so it's left out of the

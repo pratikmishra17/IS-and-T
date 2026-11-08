@@ -22,6 +22,11 @@ export interface MyDay {
   weeklyHourLimit: number | null;
   semesterName: string | null;
   request: RequestInfo | null;
+  /** The next shift / task still to come (today or within two weeks), for "next up" on an empty day. */
+  nextShift: { date: string; start: string; end: string; extra: boolean } | null;
+  nextTask: Task | null;
+  /** An admin has set weekly shifts this semester (so unsubmitted hours don't matter). */
+  shiftsSet: boolean;
 }
 
 export interface MyWeekDay {

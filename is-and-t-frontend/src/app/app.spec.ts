@@ -5,6 +5,7 @@ import { provideRouter, Router, withComponentInputBinding } from '@angular/route
 import { RouterTestingHarness } from '@angular/router/testing';
 import { routes } from './app.routes';
 import { Auth, User } from './services/auth';
+import { addDays, mondayOf } from './ui/month-picker';
 
 const admin: User = {
   id: 1,
@@ -103,6 +104,16 @@ describe('App routing', () => {
     http.expectOne('/api/admin/schedule/week').flush({ start: '2026-10-19', days: [], students: [], weeklyHourLimit: null, semesterName: null });
     http.expectOne((request) => request.url === '/api/admin/tasks').flush([]);
     http.expectOne('/api/admin/time-off/count').flush({ pending: 1 });
+    http.expectOne('/api/admin/schedule/changes').flush([{ id: 3 }]);
+    http.expectOne('/api/admin/task-offers').flush([]);
+    http.expectOne('/api/admin/schedule/requests').flush([]);
+    http.expectOne('/api/admin/tasks/backorders').flush([]);
+    // On a quiet weekend the shift and task cards load Monday instead
+    await new Promise((resolve) => setTimeout(resolve));
+    http.match((request) => request.url === '/api/admin/schedule/week')
+      .forEach((request) => request.flush({ start: '2026-10-19', days: [], students: [], weeklyHourLimit: null, semesterName: null }));
+    http.match((request) => request.url === '/api/admin/tasks').forEach((request) => request.flush([]));
+    await new Promise((resolve) => setTimeout(resolve));
     await harness.fixture.whenStable();
     harness.detectChanges();
 
@@ -110,7 +121,8 @@ describe('App routing', () => {
     expect(harness.routeNativeElement?.textContent).toContain('Sam Admin');
     expect(harness.routeNativeElement?.textContent).toContain('Resend link');
     expect(harness.routeNativeElement?.textContent).toContain('No semester covers today');
-    expect(harness.routeNativeElement?.textContent).toContain('1 time-off request to review');
+    expect(harness.routeNativeElement?.textContent).toContain('1 time-off request to answer');
+    expect(harness.routeNativeElement?.textContent).toContain('1 shift change to answer'); // every kind of request, not just time off
   });
 
   it('shows the stock of each item per room and flags low stock', async () => {
@@ -137,8 +149,6 @@ describe('App routing', () => {
     const harness = await RouterTestingHarness.create('/schedule');
     await new Promise((resolve) => setTimeout(resolve));
     http.expectOne('/api/me/week').flush({ start: '2026-10-19', days: [], hours: 0, weeklyHourLimit: 20, semesterName: 'Fall 2026' });
-    await new Promise((resolve) => setTimeout(resolve));
-    http.expectOne('/api/me/time-off').flush([]);
     await new Promise((resolve) => setTimeout(resolve));
     http.expectOne('/api/me/schedule/semesters').flush([{ id: 5, name: 'Fall 2026', type: 'FALL', startDate: '2026-08-24', endDate: '2026-12-12', weeklyHourLimit: 20, current: true }]);
     await harness.fixture.whenStable();
@@ -192,8 +202,11 @@ describe('App routing', () => {
     expect(text).toContain('Claim this task');
   });
 
-  /** Opens the Planner with one student's week and two tasks (one theirs, one unassigned). */
-  async function openPlanner(url = '/admin/planner'): Promise<RouterTestingHarness> {
+  /**
+   * Opens the Planner with one student's week and two tasks (one theirs, one unassigned). `counts`
+   * fills what the tab numbers count (nothing waiting, no tasks today, unless given).
+   */
+  async function openPlanner(url = '/admin/planner', counts: { today?: object[]; requests?: object[]; timeOff?: object[]; backorders?: object[]; changes?: object[]; offers?: object[] } = {}): Promise<RouterTestingHarness> {
     await logInAs(admin);
     const harness = await RouterTestingHarness.create(url);
     const days = ['2026-10-19', '2026-10-20', '2026-10-21', '2026-10-22', '2026-10-23'];
@@ -213,12 +226,15 @@ describe('App routing', () => {
         })),
       }],
     });
-    http.expectOne((request) => request.url === '/api/admin/tasks').flush([
-      task(9, 'Printer offline', 'UNASSIGNED', null),
-      task(10, 'Dock setup', 'ASSIGNED', { id: 1, name: 'Sam Student' }),
-    ]);
-    http.expectOne('/api/admin/schedule/requests').flush([]);
-    http.expectOne('/api/admin/time-off').flush([]);
+    // Two task lists are asked for: the week on screen, and today (for the Task list tab's number)
+    const weekTasks = [task(9, 'Printer offline', 'UNASSIGNED', null), task(10, 'Dock setup', 'ASSIGNED', { id: 1, name: 'Sam Student' })];
+    http.match((request) => request.method === 'GET' && request.url === '/api/admin/tasks').forEach((request) =>
+      request.flush(request.request.params.get('from') === request.request.params.get('to') ? counts.today ?? [] : weekTasks));
+    http.expectOne('/api/admin/schedule/requests').flush(counts.requests ?? []);
+    http.expectOne('/api/admin/time-off').flush(counts.timeOff ?? []);
+    http.expectOne('/api/admin/tasks/backorders').flush(counts.backorders ?? []);
+    http.expectOne('/api/admin/schedule/changes').flush(counts.changes ?? []);
+    http.expectOne('/api/admin/task-offers').flush(counts.offers ?? []);
     await new Promise((resolve) => setTimeout(resolve));
     await harness.fixture.whenStable();
     harness.detectChanges();
@@ -261,6 +277,33 @@ describe('App routing', () => {
     expect(page.querySelector<HTMLSelectElement>('#task-who')!.selectedOptions[0].textContent?.trim()).toBe('Sam Student ✓');
   });
 
+  it('gives a task to someone when it is dragged onto their row, and keeps tasks below the shift strip', async () => {
+    const harness = await openPlanner('/admin/planner?view=day&date=2026-10-19');
+    const timeline = harness.fixture.nativeElement.querySelector('app-day-timeline') as HTMLElement;
+    const tracks = timeline.querySelectorAll<HTMLElement>('.day-track');
+
+    // Sam's task sits under the shift strip, not on top of it
+    const samsTask = tracks[1].querySelector<HTMLElement>('[data-task="10"]')!;
+    expect(samsTask.style.top).toBe('2.125rem');
+    expect(tracks[1].querySelector('.day-shift')!.textContent).toContain('Shift 09:00–13:00');
+
+    // Drag the unassigned "Printer offline" onto Sam's row
+    const task = tracks[0].querySelector<HTMLElement>('[data-task="9"]')!;
+    expect(task.getAttribute('draggable')).toBe('true');
+    task.dispatchEvent(new Event('dragstart', { bubbles: true }));
+    harness.detectChanges();
+    const samsRow = tracks[1].parentElement!;
+    expect(samsRow.classList).toContain('drop-ready');
+    expect(tracks[0].parentElement!.classList).not.toContain('drop-ready'); // it's already unassigned
+    const over = new Event('dragover', { bubbles: true, cancelable: true });
+    tracks[1].dispatchEvent(over);
+    expect(over.defaultPrevented).toBe(true); // the browser is told a drop is allowed here
+    tracks[1].dispatchEvent(new Event('drop', { bubbles: true, cancelable: true }));
+
+    const assign = http.expectOne((r) => r.method === 'POST' && r.url === '/api/admin/tasks/9/assign');
+    expect(assign.request.body).toEqual({ studentId: 1 });
+  });
+
   it('remembers the Planner view after going to another page and back', async () => {
     const harness = await openPlanner('/admin/planner?view=day&date=2026-10-19');
     await harness.navigateByUrl('/admin/users');
@@ -269,6 +312,27 @@ describe('App routing', () => {
     await new Promise((resolve) => setTimeout(resolve));
 
     expect(TestBed.inject(Router).url).toBe('/admin/planner?view=day&date=2026-10-19');
+  });
+
+  it('shows how many are left on the Task list, Student requests (time off included) and missing items tabs', async () => {
+    const today = new Date().toLocaleDateString('en-CA');
+    const todays = (id: number, status: string) => ({ id, date: today, status });
+    const harness = await openPlanner('/admin/planner', {
+      today: [todays(20, 'UNASSIGNED'), todays(21, 'ASSIGNED'), todays(22, 'COMPLETED'), todays(23, 'CANCELLED')],
+      requests: [{ id: 1 }],
+      changes: [{ id: 3 }],
+      timeOff: [{ id: 4, date: today, affectedTasks: [] }],
+      backorders: [{ plannedItemId: 5 }],
+    });
+    const tab = (name: string) => [...harness.routeNativeElement!.querySelectorAll('[role="tab"]')].find((t) => t.textContent!.includes(name))!;
+
+    expect(harness.routeNativeElement!.querySelector('h1')!.textContent).toBe('Shifts & tasks');
+    expect(tab('Task list').textContent).toContain('2 tasks left to do today'); // the done and cancelled ones don't count
+    expect(tab('Student requests').textContent).toContain('3 student requests waiting for you'); // hours + a shift change + time off
+    expect(tab('Missing items').textContent).toContain('1 missing item for tasks');
+    expect(tab('Student requests').querySelector('.badge')!.className).toContain('bg-amber-100'); // waiting: amber
+    expect(tab('Task list').querySelector('.badge')!.className).toContain('bg-slate-200/70'); // just today's tasks: grey
+    expect(harness.routeNativeElement!.textContent).not.toContain('Time-off requests'); // time off is under Student requests now
   });
 
   it('sends the old Tasks and Schedules pages to the Planner', async () => {
@@ -315,27 +379,55 @@ describe('App routing', () => {
     expect(panel.querySelectorAll('[data-shift]').length).toBe(1);
   });
 
-  it('lets a student ask for time off for one of that day’s shifts', async () => {
+  it('lists a student’s time off and shift changes together, and asks for time off with the one change form', async () => {
     await logInAs(student);
     const harness = await RouterTestingHarness.create('/schedule');
     await new Promise((resolve) => setTimeout(resolve));
     http.expectOne('/api/me/week').flush({ start: '2026-10-19', days: [], hours: 0, weeklyHourLimit: null, semesterName: null });
     await new Promise((resolve) => setTimeout(resolve));
-    http.expectOne('/api/me/time-off').flush([{ id: 3, studentId: 1, studentName: 'Sam', date: '2026-10-20', start: null, end: null,
-      reason: null, status: 'APPROVED', submittedAt: '2026-10-15T12:00:00Z', reviewedAt: null, reviewNote: 'Good luck!', affectedTasks: [] }]);
-    await new Promise((resolve) => setTimeout(resolve));
     http.expectOne('/api/me/schedule/semesters').flush([]);
     await harness.fixture.whenStable();
     harness.detectChanges();
     const page = harness.routeNativeElement!;
-    page.querySelectorAll<HTMLButtonElement>('[role="tab"]')[2].click(); // "Time off"
+    page.querySelectorAll<HTMLButtonElement>('[role="tab"]')[2].click(); // "My requests"
+    await new Promise((resolve) => setTimeout(resolve));
+    harness.detectChanges();
+    http.expectOne('/api/me/time-off').flush([{ id: 3, studentId: 1, studentName: 'Sam', date: '2026-10-20', start: null, end: null,
+      reason: null, status: 'APPROVED', submittedAt: '2026-10-15T12:00:00Z', reviewedAt: null, reviewNote: 'Good luck!', affectedTasks: [] }]);
+    http.expectOne('/api/me/schedule/changes').flush([{ id: 7, studentId: 1, studentName: 'Sam', scope: 'ONE_DAY', date: '2026-10-22', day: 'THURSDAY',
+      hours: [{ start: '12:00', end: '16:00' }], currentHours: [{ start: '09:00', end: '12:00' }], note: null, status: 'PENDING',
+      submittedAt: '2026-10-16T12:00:00Z', reviewNote: null }]);
+    await new Promise((resolve) => setTimeout(resolve));
     await harness.fixture.whenStable();
     harness.detectChanges();
 
-    expect(page.textContent).toContain('Ask for time off');
-    expect(page.textContent).toContain('whole day');
-    expect(page.textContent).toContain('Approved');
+    expect(page.textContent).toContain('Time off · Tue, Oct 20');
     expect(page.textContent).toContain('Good luck!');
+    expect(page.textContent).toContain('Different hours · Thu, Oct 22 only');
+    expect(page.textContent).toContain('12:00–16:00 (now 09:00–12:00)');
+
+    // Ask for a change: time off for one of that day's shifts
+    [...page.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Ask for a change')!.click();
+    await new Promise((resolve) => setTimeout(resolve));
+    const today = new Date().toLocaleDateString('en-CA');
+    http.expectOne((r) => r.url === '/api/me/week' && r.params.get('start') === today).flush({ start: today, hours: 0, weeklyHourLimit: null, semesterName: null,
+      days: [{ date: today, holiday: null, dayOff: false, timeOff: [], tasks: [], shifts: [{ start: '09:00', end: '12:00', extra: false }, { start: '14:00', end: '17:00', extra: false }] }] });
+    await new Promise((resolve) => setTimeout(resolve));
+    await harness.fixture.whenStable();
+    harness.detectChanges();
+    const panel = document.querySelector('app-change-request')!;
+    expect(panel.textContent).toContain('You work 09:00–12:00, 14:00–17:00 that day now.');
+    panel.querySelector<HTMLInputElement>('input[name="off-kind"][data-option="shift"]')!.click();
+    await harness.fixture.whenStable();
+    harness.detectChanges();
+    const select = panel.querySelector<HTMLSelectElement>('#off-shift')!;
+    select.value = '14:00-17:00';
+    select.dispatchEvent(new Event('change'));
+    panel.querySelector<HTMLButtonElement>('button[type="submit"]')!.click();
+    await new Promise((resolve) => setTimeout(resolve));
+
+    const sent = http.expectOne((r) => r.method === 'POST' && r.url === '/api/me/time-off');
+    expect(sent.request.body).toEqual({ date: today, start: '14:00', end: '17:00', reason: '' });
   });
 
   it('groups consecutive holiday days into one row on the calendar page', async () => {
@@ -481,9 +573,15 @@ describe('App routing', () => {
 
     await type(page.querySelector<HTMLInputElement>('#task-title')!, 'New hire setup');
     await type(page.querySelector<HTMLInputElement>('#task-location')!, 'Rhodes Tower 1408');
-    button('Dual Monitors').click(); // the plain one, listed first
-    button('Dual Monitors').click();
+    button('Dual Monitors').click(); // the plain one, listed first: on the list with 1
+    button('Mouse').click();
     button('Webcam').click();
+    await settle();
+    button('Mouse').click(); // clicking again takes it off
+    await settle();
+    const qty = page.querySelectorAll<HTMLInputElement>('input[aria-label="How many"]')[0]; // how many is set in the list
+    qty.value = '2';
+    qty.dispatchEvent(new Event('input'));
     await settle();
     button('+ Type something else').click();
     await settle();
@@ -507,6 +605,184 @@ describe('App routing', () => {
     }));
   });
 
+  it('shows the activity log by day, with who did what and why something failed', async () => {
+    await logInAs(admin);
+    const harness = await RouterTestingHarness.create('/admin/activity');
+    const now = new Date().toISOString();
+    const first = http.expectOne((r) => r.url === '/api/admin/activity');
+    expect(first.request.params.get('who')).toBe('all');
+    first.flush({
+      total: 2, more: false, items: [
+        { id: 2, at: now, who: 'Ada Admin', email: 'ada@csuohio.edu', role: 'ADMIN', action: 'Assigned a task', target: 'Printer offline → Sam Lee',
+          succeeded: true, status: 200, reason: null, method: 'POST', path: '/api/admin/tasks/9/assign', ipAddress: '10.0.0.1' },
+        { id: 1, at: now, who: null, email: null, role: null, action: 'Logged in', target: 'guess@csuohio.edu',
+          succeeded: false, status: 401, reason: 'Wrong email or password.', method: 'POST', path: '/api/auth/login', ipAddress: '10.0.0.2' },
+      ],
+    });
+    await harness.fixture.whenStable();
+    harness.detectChanges();
+    const page = harness.routeNativeElement!;
+
+    expect(page.querySelector('h2')!.textContent).toContain('Today');
+    const [assigned, login] = [...page.querySelectorAll('[data-activity]')].map((row) => row.textContent!.replace(/\s+/g, ' '));
+    expect(assigned).toContain('Ada Admin');
+    expect(assigned).toContain('Assigned a task · Printer offline → Sam Lee');
+    expect(login).toContain('Not logged in');
+    expect(login).toContain('Didn’t work: Wrong email or password.');
+
+    // Filtering asks the server again
+    const who = page.querySelector<HTMLSelectElement>('#activity-who')!;
+    who.value = 'students';
+    who.dispatchEvent(new Event('change'));
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    const filtered = http.expectOne((r) => r.url === '/api/admin/activity');
+    expect(filtered.request.params.get('who')).toBe('students');
+    filtered.flush({ total: 0, more: false, items: [] });
+  });
+
+  /** Opens the student Team page with this access: Sam (you) and Rita, and one of Rita's tasks on Wednesday. */
+  async function openTeam(access: 'VIEW' | 'COMPLETE' | 'EDIT'): Promise<{ harness: RouterTestingHarness; days: string[] }> {
+    await logInAs(student);
+    const harness = await RouterTestingHarness.create('/team');
+    const monday = mondayOf(new Date().toLocaleDateString('en-CA'));
+    const days = [0, 1, 2, 3, 4].map((i) => addDays(monday, i));
+    http.expectOne('/api/me/team/access').flush({ studentId: 1, name: 'Sam Admin', access });
+    http.expectOne('/api/me/schedule/semesters').flush([{ id: 1, name: 'Fall 2026', type: 'FALL', startDate: '2026-08-24', endDate: '2026-12-18', weeklyHourLimit: 20, current: true }]);
+    await new Promise((resolve) => setTimeout(resolve));
+    const person = (studentId: number, name: string, shiftDay: number) => ({
+      studentId, name, hours: 3, overLimit: false,
+      days: days.map((date, i) => ({ date, cancelled: false, timeOff: [], shifts: i === shiftDay ? [{ start: '09:00', end: '12:00', extra: false }] : [] })),
+    });
+    http.expectOne((r) => r.url === '/api/me/team/week').flush({
+      start: monday, weeklyHourLimit: 20, semesterName: 'Fall 2026', days: days.map((date) => ({ date, holiday: null })),
+      students: [person(1, 'Sam Admin', 3), person(2, 'Rita Diaz', 2)],
+    });
+    http.expectOne((r) => r.url === '/api/me/team/tasks').flush([{
+      id: 9, type: 'FIX', title: 'Printer offline', description: null, date: days[2], startTime: '10:00', endTime: '10:30', durationMinutes: 30,
+      location: 'BU 201', employee: { name: 'Pat', email: null, phone: null }, supplies: [], status: 'ASSIGNED',
+      assignee: { id: 2, name: 'Rita Diaz' }, claimedOffShift: false, outcomeNotes: null, finishedAt: null, parentTaskId: null, items: [],
+    }]);
+    http.expectOne('/api/me/team/offers').flush([]);
+    http.expectOne('/api/me/schedule/changes').flush([]);
+    http.expectOne('/api/me/time-off').flush([]);
+    await new Promise((resolve) => setTimeout(resolve));
+    await harness.fixture.whenStable();
+    harness.detectChanges();
+    return { harness, days };
+  }
+
+  async function settle(harness: RouterTestingHarness): Promise<void> {
+    await new Promise((resolve) => setTimeout(resolve));
+    await harness.fixture.whenStable();
+    harness.detectChanges();
+  }
+
+  it('shows a student everyone’s week, and asks for a change when they drag across their own day', async () => {
+    const { harness, days } = await openTeam('VIEW');
+    const page = harness.routeNativeElement!;
+    const text = page.textContent!;
+
+    expect(text).toContain('Rita Diaz');
+    expect(text).toContain('Printer offline');
+    expect(text).toContain('View only');
+    expect([...page.querySelectorAll('button')].some((b) => b.textContent?.includes('New task'))).toBe(false); // planning needs edit access
+    expect(page.querySelector('button[aria-label="Edit Rita Diaz’s schedule"]')).toBeNull();
+
+    // Drag (here: press and release) halfway across your own Thursday: 13:00, for 30 minutes
+    const myRow = [...page.querySelectorAll('tbody tr')].find((row) => row.textContent!.includes('You'))!;
+    const thursday = myRow.querySelectorAll('td')[3].querySelector<HTMLElement>('.week-track')!;
+    thursday.getBoundingClientRect = () => ({ left: 0, top: 0, right: 1200, bottom: 30, width: 1200, height: 30, x: 0, y: 0, toJSON: () => ({}) });
+    thursday.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientX: 600, button: 0 }));
+    thursday.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, clientX: 600 }));
+    await settle(harness);
+    // The form checks what you work that day
+    http.expectOne((r) => r.url === '/api/me/week' && r.params.get('start') === days[3]).flush({ start: days[0], hours: 0, weeklyHourLimit: 20, semesterName: 'Fall 2026',
+      days: [{ date: days[3], holiday: null, dayOff: false, timeOff: [], tasks: [], shifts: [{ start: '09:00', end: '12:00', extra: false }] }] });
+    await settle(harness);
+
+    // The form starts with what you work that day now (09:00–12:00) plus the time picked
+    expect(page.querySelector<HTMLInputElement>('#change-date')!.value).toBe(days[3]);
+    const starts = [...page.querySelectorAll<HTMLInputElement>('input[aria-label^="Start"]')].map((input) => input.value);
+    expect(starts).toEqual(['09:00', '13:00']);
+    page.querySelector<HTMLInputElement>('input[name="kind"][data-option="week"]')!.click();
+    await settle(harness);
+    page.querySelector<HTMLButtonElement>('button[type="submit"]')!.click();
+    await settle(harness);
+
+    const sent = http.expectOne((r) => r.method === 'POST' && r.url === '/api/me/schedule/changes');
+    expect(sent.request.body).toEqual({
+      scope: 'EVERY_WEEK', date: days[3], note: '', hours: [{ start: '09:00', end: '12:00' }, { start: '13:00', end: '13:30' }],
+    });
+  });
+
+  it('lets a student offer to take someone else’s task', async () => {
+    const { harness } = await openTeam('VIEW');
+    const page = harness.routeNativeElement!;
+    page.querySelector<HTMLButtonElement>('[data-task="9"]')!.click();
+    await settle(harness);
+    http.expectOne('/api/me/team/tasks/9').flush({ task: { id: 9, title: 'Printer offline', date: '2026-10-28', startTime: '10:00', endTime: '10:30',
+      location: 'BU 201', employee: { name: 'Pat', email: null, phone: null }, supplies: [], status: 'ASSIGNED', assignee: { id: 2, name: 'Rita Diaz' } }, history: [] });
+    await settle(harness);
+
+    expect(page.textContent).toContain('It’s Rita Diaz’s now, so an admin decides.');
+    expect(page.textContent).not.toContain('Mark done'); // someone else's task, and view-only access
+    const note = page.querySelector<HTMLInputElement>('#offer-note')!;
+    note.value = 'I’m on shift then';
+    note.dispatchEvent(new Event('input'));
+    [...page.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Offer to take it')!.click();
+    await settle(harness);
+
+    const offer = http.expectOne((r) => r.method === 'POST' && r.url === '/api/me/team/tasks/9/offer');
+    expect(offer.request.body).toEqual({ note: 'I’m on shift then' });
+  });
+
+  it('lets an admin choose what a student may do with tasks', async () => {
+    await logInAs(admin);
+    const harness = await RouterTestingHarness.create('/admin/users');
+    http.expectOne('/api/admin/students').flush([{ ...student, id: 5, taskAccess: 'VIEW' }]);
+    http.expectOne('/api/admin/admins').flush([admin]);
+    await settle(harness);
+
+    const select = harness.routeNativeElement!.querySelector<HTMLSelectElement>('#access-5')!;
+    expect([...select.options].map((o) => o.textContent?.trim())).toEqual(['View only', 'View + mark done', 'Edit tasks']);
+    select.value = 'EDIT';
+    select.dispatchEvent(new Event('change'));
+    await settle(harness);
+
+    const saved = http.expectOne((r) => r.method === 'PUT' && r.url === '/api/admin/students/5/task-access');
+    expect(saved.request.body).toEqual({ access: 'EDIT' });
+  });
+
+  it('lets an admin approve a student’s shift change from Student requests', async () => {
+    const harness = await openPlanner('/admin/planner?view=requests', {
+      changes: [{ id: 3, studentId: 1, studentName: 'Sam Student', scope: 'ONE_DAY', date: '2026-10-29', day: 'THURSDAY',
+        hours: [{ start: '13:00', end: '15:00' }], currentHours: [{ start: '09:00', end: '12:00' }], note: 'Exam that morning',
+        status: 'PENDING', submittedAt: '2026-10-28T12:00:00Z', reviewedAt: null, reviewNote: null }],
+    });
+    const change = harness.routeNativeElement!.querySelector('[data-change="3"]')!;
+
+    expect(change.textContent).toContain('Thursday, Oct 29 only');
+    expect(change.textContent).toMatch(/Now:\s*09:00–12:00\s*→\s*13:00–15:00/);
+    [...change.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Approve')!.click();
+    await settle(harness);
+
+    http.expectOne((r) => r.method === 'POST' && r.url === '/api/admin/schedule/changes/3/approve');
+  });
+
+  it('logs out straight away from /logout and says so on the login page', async () => {
+    await logInAs(student);
+    const harness = await RouterTestingHarness.create('/logout');
+    http.expectOne('/api/auth/logout').flush(null);
+    await new Promise((resolve) => setTimeout(resolve));
+    http.match('/api/auth/me').forEach((request) => request.flush(null, { status: 204, statusText: 'No Content' }));
+    await new Promise((resolve) => setTimeout(resolve));
+    await harness.fixture.whenStable();
+    harness.detectChanges();
+
+    expect(TestBed.inject(Router).url).toBe('/login?ended=out');
+    expect(harness.routeNativeElement!.textContent).toContain('You’re logged out.');
+  });
+
   it('has no self-registration page', async () => {
     await RouterTestingHarness.create('/register');
 
@@ -517,6 +793,23 @@ describe('App routing', () => {
     const harness = await RouterTestingHarness.create('/login?passwordSet=true');
 
     expect(harness.routeNativeElement?.textContent).toContain('Password saved.');
+  });
+
+  it('says straight away when a set-password link was already used, and sends a new one on request', async () => {
+    const harness = await RouterTestingHarness.create('/set-password?token=old-link');
+    http.expectOne('/api/auth/password-link/check').flush({ state: 'USED' });
+    await new Promise((resolve) => setTimeout(resolve));
+    harness.detectChanges();
+
+    expect(heading(harness)).toContain('Link already used.');
+    expect(harness.routeNativeElement!.querySelector('#new-password')).toBeNull(); // no password form for a dead link
+    [...harness.routeNativeElement!.querySelectorAll('button')].find((b) => b.textContent?.includes('Send me a new one'))!.click();
+    const renew = http.expectOne('/api/auth/password-link/renew');
+    expect(renew.request.body).toEqual({ token: 'old-link' });
+    renew.flush(null);
+    await new Promise((resolve) => setTimeout(resolve));
+    harness.detectChanges();
+    expect(harness.routeNativeElement!.textContent).toContain('A new link is on its way');
   });
 
   it('shows a clear message when the set-password link has no token', async () => {

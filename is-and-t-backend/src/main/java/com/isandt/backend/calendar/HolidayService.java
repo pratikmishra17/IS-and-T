@@ -7,9 +7,12 @@ import java.util.TreeMap;
 import java.util.stream.Collectors;
 import java.util.Set;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.isandt.backend.common.text.Dates;
+import com.isandt.backend.activity.ActivityLog;
 import com.isandt.backend.common.error.ConflictException;
 import com.isandt.backend.common.error.NotFoundException;
 
@@ -22,8 +25,11 @@ public class HolidayService {
 
 	private final HolidayRepository holidays;
 
-	HolidayService(HolidayRepository holidays) {
+	private final ApplicationEventPublisher events;
+
+	HolidayService(HolidayRepository holidays, ApplicationEventPublisher events) {
 		this.holidays = holidays;
+		this.events = events;
 	}
 
 	@Transactional(readOnly = true)
@@ -34,6 +40,7 @@ public class HolidayService {
 	@Transactional
 	public HolidayChanges add(HolidayRequest request) {
 		LocalDate to = request.to() == null ? request.from() : request.to();
+		ActivityLog.about(request.name() + ", " + Dates.range(request.from(), to));
 		if (to.isBefore(request.from())) {
 			throw new ConflictException("The last day can't be before the first day.");
 		}
@@ -43,6 +50,18 @@ public class HolidayService {
 		return save(request.from().datesUntil(to.plusDays(1))
 				.map(day -> new IcsHolidayParser.ParsedHoliday(day, request.name()))
 				.toList(), HolidaySource.MANUAL);
+	}
+
+	/** Replaces a holiday's days with the edited name and dates: both happen, or neither. */
+	@Transactional
+	public HolidayChanges edit(HolidayEdit edit) {
+		List<Holiday> old = holidays.findAllById(edit.ids());
+		if (old.size() != edit.ids().size()) {
+			throw new NotFoundException("That holiday was changed or deleted meanwhile. Reload the page.");
+		}
+		holidays.deleteAll(old);
+		holidays.flush();
+		return add(edit.holiday());
 	}
 
 	@Transactional
@@ -64,7 +83,9 @@ public class HolidayService {
 
 	@Transactional
 	public void delete(Long id) {
-		holidays.delete(holidays.findById(id).orElseThrow(() -> new NotFoundException("Holiday " + id + " not found.")));
+		Holiday holiday = holidays.findById(id).orElseThrow(() -> new NotFoundException("Holiday " + id + " not found."));
+		ActivityLog.about(holiday.getName() + ", " + Dates.day(holiday.getDate()));
+		holidays.delete(holiday);
 	}
 
 	/** Saves each day that isn't a holiday yet; the set also catches the same day twice in one file. */
@@ -76,6 +97,9 @@ public class HolidayService {
 				holidays.save(new Holiday(day.date(), day.name(), source));
 				added++;
 			}
+		}
+		if (added > 0) {
+			events.publishEvent(new HolidaysAdded());
 		}
 		return new HolidayChanges(added, days.size() - added);
 	}

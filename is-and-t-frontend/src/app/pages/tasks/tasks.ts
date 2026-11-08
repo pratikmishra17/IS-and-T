@@ -57,7 +57,8 @@ export class Tasks implements OnInit {
   protected readonly panel = signal<{ mode: 'complete' | 'not-completed' | 'hand-off'; task: Task } | null>(null);
   protected notes = '';
   protected used: Record<number, number> = {};
-  protected colleagues: { id: number; name: string }[] = [];
+  /** A signal, so the list shows once it arrives (the app has no zone.js to notice a plain field changing after an await). */
+  protected readonly colleagues = signal<{ id: number; name: string }[]>([]);
   protected handOffTo: number | null = null;
   protected readonly panelError = signal<string | null>(null);
 
@@ -91,12 +92,13 @@ export class Tasks implements OnInit {
   }
 
   protected async openHandOff(task: Task): Promise<void> {
-    this.colleagues = [];
+    this.colleagues.set([]);
     this.handOffTo = null;
     this.open('hand-off', task);
     try {
-      this.colleagues = await this.api.colleagues(task.id);
-      this.handOffTo = this.colleagues[0]?.id ?? null;
+      const colleagues = await this.api.colleagues(task.id);
+      this.handOffTo = colleagues[0]?.id ?? null;
+      this.colleagues.set(colleagues);
     } catch (error) {
       this.panelError.set(errorMessage(error));
     }

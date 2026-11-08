@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 
+import com.isandt.backend.common.text.Dates;
 import com.isandt.backend.user.Admin;
 import com.isandt.backend.user.Student;
 
@@ -71,6 +72,11 @@ public class ShiftException {
 
 	public Long getId() {
 		return id;
+	}
+
+	/** "Sam Lee, 2026-10-20", for the activity log. */
+	String describe() {
+		return student.getFirstName() + " " + student.getLastName() + ", " + Dates.day(date);
 	}
 
 	Long studentId() {

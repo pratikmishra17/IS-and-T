@@ -1,4 +1,4 @@
-import { DatePipe } from '@angular/common';
+import { DatePipe, TitleCasePipe } from '@angular/common';
 import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Auth } from '../../services/auth';
@@ -22,7 +22,7 @@ interface TimelineEntry {
  */
 @Component({
   selector: 'app-home',
-  imports: [DatePipe, RouterLink],
+  imports: [DatePipe, RouterLink, TitleCasePipe],
   templateUrl: './home.html',
 })
 export class Home implements OnInit, OnDestroy {
@@ -54,13 +54,20 @@ export class Home implements OnInit, OnDestroy {
     return [...shifts, ...tasks].sort((a, b) => a.start.localeCompare(b.start) || (a.kind === 'shift' ? -1 : 1));
   });
 
-  /** The next of today's tasks still to come (or happening now). */
+  /** The next of your tasks still to come (or happening now): today's first, else the next one within two weeks. */
   protected readonly nextTask = computed(() => {
     const day = this.day();
     const now = this.now();
-    return day?.tasks
+    const today = day?.tasks
       .filter((t) => t.status === 'ASSIGNED' && at(t.date, t.endTime) > now)
-      .sort((a, b) => a.startTime.localeCompare(b.startTime))[0] ?? null;
+      .sort((a, b) => a.startTime.localeCompare(b.startTime))[0];
+    return today ?? (day?.nextTask && at(day.nextTask.date, day.nextTask.endTime) > now ? day.nextTask : null);
+  });
+
+  /** Nothing on today (a weekend, say): your next shift, so the page isn't empty. */
+  protected readonly nextShift = computed(() => {
+    const day = this.day();
+    return day && this.timeline().length === 0 ? day.nextShift : null;
   });
 
   protected readonly weekPercent = computed(() => {
@@ -83,5 +90,19 @@ export class Home implements OnInit, OnDestroy {
 
   protected startsIn(task: Task): string {
     return countdown(this.now(), at(task.date, task.startTime));
+  }
+
+  /** "today", "tomorrow" or "Mon, Nov 9". */
+  protected whenOn(date: string): string {
+    const today = this.day()?.date;
+    if (date === today) {
+      return 'today';
+    }
+    const tomorrow = new Date(`${today}T12:00:00`);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    if (date === tomorrow.toLocaleDateString('en-CA')) {
+      return 'tomorrow';
+    }
+    return new Date(`${date}T12:00:00`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   }
 }

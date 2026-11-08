@@ -14,6 +14,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import com.isandt.backend.calendar.HolidayService;
 import com.isandt.backend.calendar.Semester;
 import com.isandt.backend.calendar.SemesterService;
 import com.isandt.backend.user.Student;
@@ -26,7 +27,11 @@ class ShiftCalendarTest {
 
 	private final ShiftExceptionRepository exceptions = mock(ShiftExceptionRepository.class);
 
-	private final ShiftCalendar calendar = new ShiftCalendar(semesters, patterns, exceptions);
+	private final KeptDayRepository kept = mock(KeptDayRepository.class);
+
+	private final HolidayService holidays = mock(HolidayService.class);
+
+	private final ShiftCalendar calendar = new ShiftCalendar(semesters, patterns, exceptions, kept, holidays);
 
 	private final Student sam = withId(new Student("sam@example.com", "Sam", "Student", "2001", null), 7L);
 
@@ -62,6 +67,23 @@ class ShiftCalendarTest {
 
 		assertThat(day.cancelled()).isTrue();
 		assertThat(day.shifts()).containsExactly(new ShiftCalendar.Shift(LocalTime.of(15, 0), LocalTime.of(17, 0), true));
+	}
+
+	@Test
+	void aKeptDayUsesTheShiftsSavedForItInsteadOfTheWeeklyPattern() {
+		Semester fall = mock(Semester.class);
+		when(kept.findByDateBetween(any(), any())).thenReturn(List.of(new KeptDay(sam, fall, monday,
+				List.of(new TimeBlock(DayOfWeek.MONDAY, LocalTime.of(12, 0), LocalTime.of(16, 0))))));
+
+		assertThat(calendar.on(7L, monday).shifts()).containsExactly(new ShiftCalendar.Shift(LocalTime.of(12, 0), LocalTime.of(16, 0), false));
+	}
+
+	@Test
+	void aHolidayHasNoWeeklyShiftsButAnExtraShiftStillCounts() {
+		when(holidays.namesBetween(any(), any())).thenReturn(java.util.Map.of(monday, "Founders Day", nextMonday, "Open house"));
+
+		assertThat(calendar.on(7L, monday).shifts()).isEmpty();
+		assertThat(calendar.on(7L, nextMonday).shifts()).containsExactly(new ShiftCalendar.Shift(LocalTime.of(15, 0), LocalTime.of(17, 0), true));
 	}
 
 	@Test

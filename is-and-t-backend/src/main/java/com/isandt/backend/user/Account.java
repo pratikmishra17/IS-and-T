@@ -62,6 +62,11 @@ public abstract class Account {
 	/** True until the person picks a new password; meanwhile they can do nothing else. */
 	private boolean mustChangePassword;
 
+	/** What opens after logging in (their choice on the Account page). */
+	@Enumerated(EnumType.STRING)
+	@Column(name = "after_login", nullable = false)
+	private AfterLogin afterLogin = AfterLogin.HOME;
+
 	/** Required by JPA, which creates the object first and then fills in the fields. */
 	protected Account() {
 	}
@@ -81,6 +86,14 @@ public abstract class Account {
 	/** Emails are compared case-insensitively, so they are always stored trimmed and lowercase. */
 	public static String normalizeEmail(String email) {
 		return email.trim().toLowerCase(Locale.ROOT);
+	}
+
+	public void chooseAfterLogin(AfterLogin afterLogin) {
+		this.afterLogin = afterLogin;
+	}
+
+	public AfterLogin getAfterLogin() {
+		return afterLogin;
 	}
 
 	public void rename(String firstName, String lastName) {

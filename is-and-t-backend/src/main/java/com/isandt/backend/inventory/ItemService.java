@@ -7,6 +7,7 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.isandt.backend.activity.ActivityLog;
 import com.isandt.backend.common.error.ConflictException;
 import com.isandt.backend.common.error.NotFoundException;
 
@@ -39,9 +40,11 @@ public class ItemService {
 		Map<Long, List<StockLevel>> stockByItem = stock.findAllWithLocation().stream()
 				.collect(Collectors.groupingBy(level -> level.getItem().getId()));
 		Map<Long, Integer> reserved = reservedByItem();
+		java.util.Set<Long> withHistory = new java.util.HashSet<>(transactions.itemIdsWithHistory());
+		withHistory.addAll(planned.itemIdsUsed());
 		return items.findAllWithCategory().stream()
 				.map(item -> ItemResponse.from(item, stockByItem.getOrDefault(item.getId(), List.of()),
-						reserved.getOrDefault(item.getId(), 0)))
+						reserved.getOrDefault(item.getId(), 0), withHistory.contains(item.getId())))
 				.toList();
 	}
 
@@ -49,7 +52,7 @@ public class ItemService {
 	public ItemResponse create(ItemDetails details) {
 		Category category = catalog.findCategory(details.categoryId());
 		requireNameFree(category, details.name());
-		return ItemResponse.from(items.save(new Item(category, details)), List.of(), 0);
+		return ItemResponse.from(items.save(new Item(category, details)), List.of(), 0, false);
 	}
 
 	@Transactional
@@ -83,6 +86,7 @@ public class ItemService {
 	@Transactional
 	public void delete(Long id) {
 		Item item = find(id);
+		ActivityLog.about(item.getName());
 		if (transactions.existsByItem(item) || planned.existsByItem(item)) {
 			throw new ConflictException(item.getName() + " has stock or task history, so it can't be deleted. Archive it instead.");
 		}
@@ -90,7 +94,8 @@ public class ItemService {
 	}
 
 	ItemResponse describe(Item item) {
-		return ItemResponse.from(item, stock.findByItemWithLocation(item), reservedByItem().getOrDefault(item.getId(), 0));
+		return ItemResponse.from(item, stock.findByItemWithLocation(item), reservedByItem().getOrDefault(item.getId(), 0),
+				transactions.existsByItem(item) || planned.existsByItem(item));
 	}
 
 	/** Item id → how many are set aside for upcoming tasks. */

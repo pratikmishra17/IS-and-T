@@ -1,68 +1,15 @@
-@if (mode() === 'timeoff') {
-  @if (lastOutcome(); as outcome) {
-    <div role="status" class="mb-4 rounded-2xl bg-white/70 px-4 py-3 text-sm">
-      <div class="flex items-start justify-between gap-3">
-        <p class="font-semibold text-slate-900">{{ outcome.title }}</p>
-        <button type="button" class="icon-button size-6" aria-label="Dismiss" (click)="lastOutcome.set(null)">✕</button>
-      </div>
-      @if (outcome.lines.length === 0) { <p class="mt-1 text-slate-600">No tasks were affected.</p> }
-      <ul class="mt-1 space-y-1">
-        @for (line of outcome.lines; track $index) {
-          <li [class.text-rose-900]="line.includes('couldn')" [class.font-medium]="line.includes('couldn')" [class.text-slate-700]="!line.includes('couldn')">{{ line.includes('couldn') ? '⚠ ' : '✓ ' }}{{ line }}</li>
-        }
-      </ul>
-    </div>
-  }
-  @if (timeOff().length === 0) {
-    <p class="py-12 text-center text-sm text-slate-600">No time-off requests waiting. Students ask from their Schedule page.</p>
-  } @else {
-    <ul class="space-y-3">
-      @for (request of timeOff(); track request.id) {
-        <li class="rounded-2xl border border-white/70 bg-white/50 p-4">
-          <div class="flex flex-wrap items-start justify-between gap-2">
-            <div>
-              <p class="font-semibold text-slate-900">{{ request.studentName }}</p>
-              <p class="text-sm text-slate-700">{{ request.date | date: 'EEEE, MMM d' }} · {{ window(request) }}</p>
-              @if (request.reason) { <p class="mt-1 text-sm text-slate-600">“{{ request.reason }}”</p> }
-            </div>
-            <p class="text-xs text-slate-500">asked {{ request.submittedAt | date: 'MMM d, h:mm a' }}</p>
-          </div>
-          @if (request.affectedTasks.length > 0) {
-            <div class="mt-3 rounded-xl bg-amber-50/80 px-3 py-2 text-sm text-amber-950">
-              <p class="font-medium">Approving moves {{ request.affectedTasks.length === 1 ? 'this task' : 'these tasks' }} to someone else on shift:</p>
-              <ul class="mt-1">
-                @for (task of request.affectedTasks; track task.id) { <li>• {{ task.startTime }}–{{ task.endTime }} {{ task.title }}</li> }
-              </ul>
-            </div>
-          } @else {
-            <p class="mt-2 text-xs text-slate-500">No tasks in that time.</p>
-          }
-          <div class="mt-3 flex flex-col gap-2 sm:flex-row">
-            <label class="sr-only" [for]="'note-' + request.id">Note to the student</label>
-            <input [id]="'note-' + request.id" class="glass-input min-w-0 flex-1 rounded-xl px-3 py-2 text-sm" placeholder="Note to the student (optional)" maxlength="500" [(ngModel)]="reviewNotes[request.id]" />
-            <div class="flex gap-2">
-              <button type="button" class="btn btn-quiet" [disabled]="reviewingId() === request.id" (click)="decline(request)">Decline</button>
-              <button type="button" class="btn submit-button text-white" [disabled]="reviewingId() === request.id" (click)="approve(request)">Approve</button>
-            </div>
-          </div>
-        </li>
-      }
-    </ul>
-  }
+@if (requests().length === 0) {
+  <p class="py-12 text-center text-sm text-slate-600">No requests waiting. Students submit their hours from their Schedule page.</p>
 } @else {
-  @if (requests().length === 0) {
-    <p class="py-12 text-center text-sm text-slate-600">No requests waiting. Students submit their hours from their Schedule page.</p>
-  } @else {
-    <ul class="divide-y divide-slate-200/60">
-      @for (request of requests(); track request.id) {
-        <li class="flex flex-wrap items-center justify-between gap-3 py-3">
-          <div>
-            <p class="font-medium text-slate-900">{{ request.studentName }}</p>
-            <p class="text-sm text-slate-500">{{ request.semesterName }} · submitted {{ request.submittedAt | date: 'MMM d, h:mm a' }}</p>
-          </div>
-          <button type="button" class="btn submit-button text-white" (click)="review.emit(request)">Review</button>
-        </li>
-      }
-    </ul>
-  }
+  <ul class="divide-y divide-slate-200/60">
+    @for (request of requests(); track request.id) {
+      <li class="flex flex-wrap items-center justify-between gap-3 py-3">
+        <div>
+          <p class="font-medium text-slate-900">{{ request.studentName }}</p>
+          <p class="text-sm text-slate-500">{{ request.semesterName }} · submitted {{ request.submittedAt | date: 'MMM d, h:mm a' }}</p>
+        </div>
+        <button type="button" class="btn submit-button text-white" (click)="review.emit(request)">Review</button>
+      </li>
+    }
+  </ul>
 }

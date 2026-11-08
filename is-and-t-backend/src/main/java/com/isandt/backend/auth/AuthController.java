@@ -2,6 +2,7 @@ package com.isandt.backend.auth;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Map;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -21,6 +22,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.isandt.backend.activity.ActivityLog;
+import com.isandt.backend.activity.Activity;
 import com.isandt.backend.common.error.ConflictException;
 import com.isandt.backend.common.error.ForbiddenException;
 import com.isandt.backend.user.Account;
@@ -50,9 +53,13 @@ public class AuthController {
 
 	private final Clock clock;
 
+	private final PasswordTokenService passwordTokens;
+
 	AuthController(AuthService authService, Accounts accounts, AuthenticationManager authenticationManager,
-			SecurityContextRepository securityContextRepository, LoginThrottle throttle, SessionPolicy policy, Clock clock) {
+			SecurityContextRepository securityContextRepository, LoginThrottle throttle, SessionPolicy policy, Clock clock,
+			PasswordTokenService passwordTokens) {
 		this.authService = authService;
+		this.passwordTokens = passwordTokens;
 		this.accounts = accounts;
 		this.authenticationManager = authenticationManager;
 		this.securityContextRepository = securityContextRepository;
@@ -66,10 +73,12 @@ public class AuthController {
 	 * A wrong email or password throws AuthenticationException, which becomes a 401. Too many
 	 * failures for one email or from one network address are refused for a while (429).
 	 */
+	@Activity("Logged in")
 	@PostMapping("/login")
 	SessionResponse login(@Valid @RequestBody LoginRequest request, HttpServletRequest httpRequest,
 			HttpServletResponse httpResponse) {
 		String email = Account.normalizeEmail(request.email());
+		ActivityLog.about(email); // so a failed login shows which account was tried
 		String address = httpRequest.getRemoteAddr();
 		throttle.check(LoginThrottle.LOGIN_PER_ACCOUNT, email);
 		throttle.check(LoginThrottle.LOGIN_PER_ADDRESS, address);
@@ -128,6 +137,7 @@ public class AuthController {
 	}
 
 	/** Answers with the account's role, so the app can send the person to the right portal's login page. */
+	@Activity("Set a password from an email link")
 	@PostMapping("/set-password")
 	SetPasswordResponse setPassword(@Valid @RequestBody SetPasswordRequest request, HttpServletRequest httpRequest) {
 		String address = httpRequest.getRemoteAddr();
@@ -141,11 +151,41 @@ public class AuthController {
 		}
 	}
 
+	/**
+	 * The set-password page checks its link as it opens: {"state": "VALID" | "USED" | "EXPIRED" | "INVALID"}.
+	 * POST, so the token stays out of URLs and logs. Unknown tokens count toward the same limit as
+	 * wrong set-password attempts, so tokens can't be guessed here either.
+	 */
+	@Activity("Opened a set-password link")
+	@PostMapping("/password-link/check")
+	Map<String, PasswordTokenService.LinkState> checkLink(@Valid @RequestBody LinkRequest request, HttpServletRequest httpRequest) {
+		String address = httpRequest.getRemoteAddr();
+		throttle.check(LoginThrottle.SET_PASSWORD_PER_ADDRESS, address);
+		PasswordTokenService.LinkState state = passwordTokens.check(request.token());
+		if (state == PasswordTokenService.LinkState.INVALID) {
+			throttle.record(LoginThrottle.SET_PASSWORD_PER_ADDRESS, address);
+		}
+		return Map.of("state", state);
+	}
+
+	/** "Send me a new one" for a used or expired link. Always 204, limited like forgot-password. */
+	@Activity("Asked for a new set-password link")
+	@PostMapping("/password-link/renew")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	void renewLink(@Valid @RequestBody LinkRequest request, HttpServletRequest httpRequest) {
+		String address = httpRequest.getRemoteAddr();
+		throttle.check(LoginThrottle.RESET_PER_ADDRESS, address);
+		throttle.record(LoginThrottle.RESET_PER_ADDRESS, address);
+		authService.renewLink(request.token());
+	}
+
 	/** Limited per email and per address, so it can't be used to flood someone's inbox. */
+	@Activity("Asked for a password reset link")
 	@PostMapping("/forgot-password")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	void forgotPassword(@Valid @RequestBody ForgotPasswordRequest request, HttpServletRequest httpRequest) {
 		String email = Account.normalizeEmail(request.email());
+		ActivityLog.about(email);
 		String address = httpRequest.getRemoteAddr();
 		throttle.check(LoginThrottle.RESET_PER_ACCOUNT, email);
 		throttle.check(LoginThrottle.RESET_PER_ADDRESS, address);

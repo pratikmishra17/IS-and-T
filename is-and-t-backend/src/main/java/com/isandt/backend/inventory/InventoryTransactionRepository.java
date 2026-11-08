@@ -12,6 +12,13 @@ interface InventoryTransactionRepository extends JpaRepository<InventoryTransact
 
 	boolean existsByLocation(StorageLocation location);
 
+	/** Items and rooms with any stock history (they can't be deleted, only archived). */
+	@Query("select distinct t.item.id from InventoryTransaction t")
+	java.util.Set<Long> itemIdsWithHistory();
+
+	@Query("select distinct t.location.id from InventoryTransaction t")
+	java.util.Set<Long> locationIdsWithHistory();
+
 	/** Newest first; the Pageable decides how many ("the latest 100"). */
 	@Query("select t from InventoryTransaction t join fetch t.item join fetch t.location left join fetch t.admin left join fetch t.student order by t.occurredAt desc")
 	List<InventoryTransaction> findLatest(Pageable page);

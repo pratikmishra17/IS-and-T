@@ -5,6 +5,7 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.isandt.backend.activity.ActivityLog;
 import com.isandt.backend.auth.PasswordTokenService;
 import com.isandt.backend.auth.TokenPurpose;
 import com.isandt.backend.common.error.ConflictException;
@@ -60,7 +61,9 @@ public class AdminService {
 
 	@Transactional
 	public void sendPasswordLink(Long id) {
-		Accounts.sendPasswordLink(find(id), passwordTokens, emails);
+		Admin admin = find(id);
+		ActivityLog.about(admin.getFirstName() + " " + admin.getLastName());
+		Accounts.sendPasswordLink(admin, passwordTokens, emails);
 	}
 
 	@Transactional
@@ -86,7 +89,9 @@ public class AdminService {
 	 */
 	@Transactional
 	public void remove(Long id, Long currentAdminId) {
-		admins.delete(findOther(id, currentAdminId));
+		Admin admin = findOther(id, currentAdminId);
+		ActivityLog.about(admin.getFirstName() + " " + admin.getLastName()); // gone after this, so named now
+		admins.delete(admin);
 	}
 
 	private Admin find(Long id) {

@@ -73,6 +73,10 @@ public class PasswordToken {
 		return usedAt == null && now.isBefore(expiresAt);
 	}
 
+	boolean isUsed() {
+		return usedAt != null;
+	}
+
 	void markUsed() {
 		this.usedAt = Instant.now();
 	}

@@ -4,7 +4,7 @@
 @if (!settings()) {
   <p class="mt-6 text-sm text-slate-500">{{ error() ?? 'Loading…' }}</p>
 } @else {
-  <form #settingsForm="ngForm" (ngSubmit)="save(settingsForm)" class="mt-6 grid gap-4 lg:grid-cols-2" novalidate>
+  <form #settingsForm="ngForm" (input)="error.set(null)" (change)="error.set(null)" (ngSubmit)="save(settingsForm)" class="mt-6 grid gap-4 lg:grid-cols-2" novalidate>
     <section class="glass-panel rounded-3xl p-6" aria-labelledby="digest-title">
       <h2 id="digest-title" class="font-semibold text-slate-900">Daily digest</h2>
       <p class="mt-1 text-sm text-slate-600">An email on weekday mornings with today’s unassigned tasks, low stock, and backorders that are back in stock.</p>

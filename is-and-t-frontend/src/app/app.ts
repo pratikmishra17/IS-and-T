@@ -1,4 +1,5 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
+import { LastPage } from './services/last-page';
 import { RouterOutlet } from '@angular/router';
 import { SessionWarningDialog } from './ui/session-timer';
 
@@ -12,4 +13,7 @@ import { SessionWarningDialog } from './ui/session-timer';
   styleUrl: './app.css',
   templateUrl: './app.html',
 })
-export class App {}
+export class App {
+  // Started here so every page visit is noted, for "open the page I was on" after logging in.
+  private readonly lastPage = inject(LastPage);
+}

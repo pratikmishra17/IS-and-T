@@ -15,6 +15,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.validation.Valid;
 
+import com.isandt.backend.activity.Activity;
+
 /** Admin portal: semesters. Admins only (/api/admin/**). */
 @RestController
 @RequestMapping("/api/admin/semesters")
@@ -31,17 +33,20 @@ public class SemesterController {
 		return semesterService.list();
 	}
 
+	@Activity("Added a semester")
 	@PostMapping
 	@ResponseStatus(HttpStatus.CREATED)
 	SemesterResponse create(@Valid @RequestBody SemesterDetails details) {
 		return semesterService.create(details);
 	}
 
+	@Activity("Changed a semester")
 	@PutMapping("/{id}")
 	SemesterResponse update(@PathVariable Long id, @Valid @RequestBody SemesterDetails details) {
 		return semesterService.update(id, details);
 	}
 
+	@Activity("Deleted a semester")
 	@DeleteMapping("/{id}")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	void delete(@PathVariable Long id) {

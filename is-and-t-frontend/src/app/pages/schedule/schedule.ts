@@ -1,11 +1,12 @@
 import { DatePipe } from '@angular/common';
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Auth } from '../../services/auth';
 import { Semester } from '../../services/calendar';
 import { errorMessage } from '../../services/errors';
-import { MyWeek, PortalApi, ShiftView } from '../../services/portal';
-import { MyTimeOffApi, TimeOff, window } from '../../services/time-off';
+import { MyWeek, PortalApi } from '../../services/portal';
+import { ChangeRequestPanel } from '../../ui/change-request';
+import { MyRequests } from '../../ui/my-requests';
 import { Confirm } from '../../ui/confirm';
 import { Toasts } from '../../ui/toast';
 import { MyScheduleApi, StudentSchedule, TimeBlock, WEEKDAYS, dayName, totalHours } from '../../services/schedule';
@@ -13,31 +14,26 @@ import { TimeBlocksEditor } from '../../ui/time-blocks-editor';
 import { remembered } from '../../services/remember';
 
 /**
- * User portal: My schedule (/schedule). The student enters class times and the hours they'd like
- * to work, submits them, and sees the shifts an admin approved.
+ * User portal: My schedule (/schedule). The student sees their week, enters class times and the
+ * hours they'd like to work (and submits them), and under My requests asks for a change (time off
+ * or different hours) and follows the answers.
  */
 @Component({
   selector: 'app-schedule',
-  imports: [DatePipe, FormsModule, TimeBlocksEditor],
+  imports: [DatePipe, FormsModule, TimeBlocksEditor, ChangeRequestPanel, MyRequests],
   templateUrl: './schedule.html',
 })
 export class Schedule implements OnInit {
   private readonly api = inject(MyScheduleApi);
   private readonly portal = inject(PortalApi);
-  private readonly timeOffApi = inject(MyTimeOffApi);
   private readonly confirm = inject(Confirm);
   private readonly toasts = inject(Toasts);
 
   protected readonly tab = remembered<'week' | 'hours' | 'timeoff'>('schedule.tab', 'week', { allowed: ['week', 'hours', 'timeoff'] });
 
-  // Time off
-  protected readonly myTimeOff = signal<TimeOff[]>([]);
-  protected readonly window = window;
-  protected timeOffDraft: { date: string; kind: 'day' | 'shift' | 'hours'; shift: string; start: string; end: string; reason: string } = this.emptyTimeOff();
-  /** That date's shifts, to pick "one shift" from. */
-  protected readonly shiftsOnDate = signal<ShiftView[]>([]);
-  protected readonly timeOffError = signal<string | null>(null);
-  protected readonly sendingTimeOff = signal(false);
+  // My requests: the shared "Ask for a change" form and the list of what was asked
+  protected readonly changePanel = viewChild.required(ChangeRequestPanel);
+  protected readonly myRequests = viewChild<MyRequests>('myRequests');
 
   // Calendar subscription
   protected readonly calendarLink = signal<{ url: string; webcalUrl: string } | null>(null);
@@ -65,7 +61,6 @@ export class Schedule implements OnInit {
   async ngOnInit(): Promise<void> {
     try {
       this.week.set(await this.portal.week());
-      this.myTimeOff.set(await this.timeOffApi.list());
       const semesters = await this.api.semesters();
       this.semesters.set(semesters);
       const first = semesters.find((semester) => semester.current) ?? semesters[0];
@@ -122,67 +117,6 @@ export class Schedule implements OnInit {
     }
   }
 
-  // ---- Time off ----
-
-  /** When the date changes, fetch that day's shifts so "one shift" can offer them. */
-  protected async timeOffDateChanged(date: string): Promise<void> {
-    this.timeOffDraft.date = date;
-    this.timeOffDraft.shift = '';
-    this.shiftsOnDate.set([]);
-    if (!date) {
-      return;
-    }
-    try {
-      const week = await this.portal.week(date);
-      const shifts = week.days.find((day) => day.date === date)?.shifts ?? [];
-      this.shiftsOnDate.set(shifts);
-      this.timeOffDraft.shift = shifts[0] ? `${shifts[0].start}-${shifts[0].end}` : '';
-    } catch (error) {
-      this.timeOffError.set(errorMessage(error));
-    }
-  }
-
-  protected async requestTimeOff(): Promise<void> {
-    const draft = this.timeOffDraft;
-    let start: string | null = null;
-    let end: string | null = null;
-    if (draft.kind === 'shift') {
-      [start, end] = draft.shift.split('-');
-    } else if (draft.kind === 'hours') {
-      start = draft.start;
-      end = draft.end;
-    }
-    if (!draft.date || (draft.kind !== 'day' && (!start || !end))) {
-      this.timeOffError.set('Choose a date, and the shift or hours you need off.');
-      return;
-    }
-    this.sendingTimeOff.set(true);
-    this.timeOffError.set(null);
-    try {
-      await this.timeOffApi.request(draft.date, start, end, draft.reason);
-      this.timeOffDraft = this.emptyTimeOff();
-      this.shiftsOnDate.set([]);
-      this.myTimeOff.set(await this.timeOffApi.list());
-      this.toasts.success('Sent. An admin will approve or decline it, and you’ll get an email.');
-    } catch (error) {
-      this.timeOffError.set(errorMessage(error));
-    } finally {
-      this.sendingTimeOff.set(false);
-    }
-  }
-
-  protected async withdrawTimeOff(request: TimeOff): Promise<void> {
-    if (!(await this.confirm.ask({ title: 'Withdraw this request?', message: 'You can ask again later.', confirmLabel: 'Withdraw' }))) {
-      return;
-    }
-    try {
-      await this.timeOffApi.withdraw(request.id);
-      this.myTimeOff.set(await this.timeOffApi.list());
-    } catch (error) {
-      this.toasts.error(errorMessage(error));
-    }
-  }
-
   // ---- Calendar subscription ----
 
   protected async showCalendarLink(): Promise<void> {
@@ -213,13 +147,17 @@ export class Schedule implements OnInit {
     }
   }
 
-  private emptyTimeOff(): { date: string; kind: 'day' | 'shift' | 'hours'; shift: string; start: string; end: string; reason: string } {
-    return { date: '', kind: 'day', shift: '', start: '09:00', end: '12:00', reason: '' };
-  }
-
   private show(schedule: StudentSchedule): void {
     this.schedule.set(schedule);
     this.classes.set(schedule.classes);
     this.preferred.set(schedule.preferred);
+  }
+
+  /** Monday–Friday, plus Saturday or Sunday only when something is on them (an extra shift, a task). */
+  protected shownDays(week: MyWeek): MyWeek['days'] {
+    return week.days.filter((day) => {
+      const weekday = new Date(`${day.date}T12:00:00`).getDay();
+      return (weekday !== 0 && weekday !== 6) || day.shifts.length > 0 || day.tasks.length > 0 || day.timeOff.length > 0;
+    });
   }
 }

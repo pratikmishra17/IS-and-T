@@ -21,7 +21,7 @@ const ICONS = {
 export class Navbar {
   protected readonly auth = inject(Auth);
   private readonly router = inject(Router);
-  protected readonly sections = ['home', 'tasks', 'schedule', 'inventory'];
+  protected readonly sections = ['home', 'tasks', 'team', 'schedule', 'inventory'];
 
   /** Phones: the most used pages as a tab bar at the bottom (within thumb reach); the rest under "More". */
   protected readonly mobileTabs = [

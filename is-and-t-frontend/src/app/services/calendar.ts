@@ -34,6 +34,15 @@ export interface HolidayChanges {
   skipped: number;
 }
 
+/** What deleting a semester also deletes. */
+export interface SemesterUsage {
+  studentsWithShifts: number;
+  weeklyShifts: number;
+  studentsWithAvailability: number;
+  hoursRequests: number;
+  shiftChanges: number;
+}
+
 /** Admin portal: semesters and holidays. */
 @Injectable({ providedIn: 'root' })
 export class CalendarApi {
@@ -49,6 +58,11 @@ export class CalendarApi {
 
   updateSemester(id: number, details: SemesterDetails): Promise<Semester> {
     return firstValueFrom(this.http.put<Semester>(`/api/admin/semesters/${id}`, details));
+  }
+
+  /** What deleting a semester would also delete, for the confirmation. */
+  semesterUsage(id: number): Promise<SemesterUsage> {
+    return firstValueFrom(this.http.get<SemesterUsage>(`/api/admin/schedule/semesters/${id}/usage`));
   }
 
   async deleteSemester(id: number): Promise<void> {
@@ -68,6 +82,11 @@ export class CalendarApi {
     const form = new FormData();
     form.append('file', file);
     return firstValueFrom(this.http.post<HolidayChanges>('/api/admin/holidays/import', form));
+  }
+
+  /** A holiday's days (ids) become the name and dates given, in one step. */
+  editHoliday(ids: number[], name: string, from: string, to: string | null): Promise<HolidayChanges> {
+    return firstValueFrom(this.http.put<HolidayChanges>('/api/admin/holidays', { ids, holiday: { name, from, to } }));
   }
 
   async deleteHoliday(id: number): Promise<void> {

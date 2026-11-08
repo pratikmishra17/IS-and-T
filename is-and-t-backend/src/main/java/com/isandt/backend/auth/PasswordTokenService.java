@@ -8,6 +8,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.HexFormat;
+import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -60,6 +61,24 @@ public class PasswordTokenService {
 		Account account = token.getAccount();
 		tokens.findUnusedFor(account).forEach(PasswordToken::markUsed);
 		return account;
+	}
+
+	/** What a link's token is now, so the set-password page can say so before anyone types a password. */
+	public enum LinkState {
+		VALID, USED, EXPIRED, INVALID
+	}
+
+	@Transactional(readOnly = true)
+	public LinkState check(String rawToken) {
+		return tokens.findByTokenHash(hash(rawToken))
+				.map(token -> token.isUsable(Instant.now()) ? LinkState.VALID : token.isUsed() ? LinkState.USED : LinkState.EXPIRED)
+				.orElse(LinkState.INVALID);
+	}
+
+	/** The account behind a used or expired link ("send me a new one"); empty for a working or unknown link. */
+	@Transactional(readOnly = true)
+	public Optional<Account> accountForRenewal(String rawToken) {
+		return tokens.findByTokenHash(hash(rawToken)).filter(token -> !token.isUsable(Instant.now())).map(PasswordToken::getAccount);
 	}
 
 	static String hash(String rawToken) {

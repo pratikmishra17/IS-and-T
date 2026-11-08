@@ -64,7 +64,7 @@ export class AdminInventory implements OnInit {
 
   // Stock panel
   protected readonly stockItem = signal<Item | null>(null);
-  protected stockDraft: { locationId: number | null; type: AdjustmentType; quantity: number | null; note: string } = this.emptyStock();
+  protected stockDraft: { locationId: number | null; type: AdjustmentType; quantity: number | null; note: string; toLocationId: number | null } = this.emptyStock();
 
   // Item history panel
   protected readonly historyItem = signal<Item | null>(null);
@@ -79,6 +79,10 @@ export class AdminInventory implements OnInit {
   protected readonly categoryPanelOpen = signal(false);
   protected readonly editingCategory = signal<Category | null>(null);
   protected categoryDraft = '';
+  /** The "new category" box at the top of the Categories tab. */
+  protected newCategory = '';
+  protected readonly newCategoryError = signal<string | null>(null);
+  protected readonly addingCategory = signal(false);
 
   async ngOnInit(): Promise<void> {
     try {
@@ -205,8 +209,18 @@ export class AdminInventory implements OnInit {
       return null;
     }
     const current = this.stockInRoom();
-    const after = this.stockDraft.type === 'ADD' ? current + quantity : this.stockDraft.type === 'REMOVE' ? current - quantity : quantity;
+    if (this.stockDraft.type === 'MOVE' && (quantity === 0 || !this.stockDraft.toLocationId || this.stockDraft.toLocationId === this.stockDraft.locationId)) {
+      return null; // a move needs a number and a different room
+    }
+    const after = this.stockDraft.type === 'ADD' ? current + quantity
+      : this.stockDraft.type === 'SET' ? quantity : current - quantity; // REMOVE and MOVE take them out of this room
     return after < 0 ? null : after;
+  }
+
+  /** For a move: how many the other room will have. */
+  protected stockInTarget(): number {
+    const target = this.stockItem()?.stock.find((s) => s.locationId === this.stockDraft.toLocationId)?.quantity ?? 0;
+    return target + (this.stockDraft.quantity ?? 0);
   }
 
   protected locationLabel(id: number | null): string {
@@ -221,7 +235,7 @@ export class AdminInventory implements OnInit {
     }
     await this.submit(async () => {
       const saved = await this.api.adjustStock(item.id, this.stockDraft.locationId!, this.stockDraft.type,
-        this.stockDraft.quantity!, this.stockDraft.note);
+        this.stockDraft.quantity!, this.stockDraft.note, this.stockDraft.type === 'MOVE' ? this.stockDraft.toLocationId : null);
       this.upsertItem(saved);
       this.locations.set(await this.api.locations());
       this.stockItem.set(null);
@@ -236,7 +250,7 @@ export class AdminInventory implements OnInit {
   }
 
   protected reasonLabel(reason: Transaction['reason']): string {
-    return { RESTOCK: 'Added', REMOVAL: 'Removed', ADJUSTMENT: 'Count corrected', DEPLOYMENT: 'Used in deployment' }[reason];
+    return { RESTOCK: 'Added', REMOVAL: 'Removed', ADJUSTMENT: 'Count corrected', DEPLOYMENT: 'Used in deployment', MOVE: 'Moved' }[reason];
   }
 
   // ---- Rooms ----
@@ -282,6 +296,30 @@ export class AdminInventory implements OnInit {
   }
 
   // ---- Categories ----
+
+  protected focusNewCategory(): void {
+    document.querySelector<HTMLInputElement>('#new-category')?.focus();
+  }
+
+  protected async addCategoryInline(): Promise<void> {
+    const name = this.newCategory.trim();
+    if (!name) {
+      return;
+    }
+    this.addingCategory.set(true);
+    this.newCategoryError.set(null);
+    try {
+      const saved = await this.api.saveCategory(name);
+      this.categories.set(await this.api.categories());
+      this.newCategory = '';
+      this.toasts.success(`${saved.name} was added.`);
+      this.focusNewCategory(); // ready for the next one
+    } catch (error) {
+      this.newCategoryError.set(errorMessage(error));
+    } finally {
+      this.addingCategory.set(false);
+    }
+  }
 
   protected openCategory(category?: Category): void {
     this.editingCategory.set(category ?? null);
@@ -368,10 +406,10 @@ export class AdminInventory implements OnInit {
   }
 
   private emptyItem(): ItemDetails {
-    return { categoryId: null, name: '', manufacturer: '', model: '', lowStockThreshold: 0, attributes: {} };
+    return { categoryId: null, name: '', manufacturer: '', model: '', lowStockThreshold: 0, attributes: {}, startingQuantity: null, startingLocationId: this.locations()[0]?.id ?? null };
   }
 
-  private emptyStock(): { locationId: number | null; type: AdjustmentType; quantity: number | null; note: string } {
-    return { locationId: null, type: 'ADD', quantity: null, note: '' };
+  private emptyStock(): { locationId: number | null; type: AdjustmentType; quantity: number | null; note: string; toLocationId: number | null } {
+    return { locationId: null, type: 'ADD', quantity: null, note: '', toLocationId: null };
   }
 }

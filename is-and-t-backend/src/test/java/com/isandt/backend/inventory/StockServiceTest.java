@@ -70,6 +70,28 @@ class StockServiceTest {
 	}
 
 	@Test
+	void movingTakesThemOutOfOneRoomAndPutsThemInTheOther() {
+		StorageLocation closet = new StorageLocation(new LocationRequest("Fenn Tower", "404", null));
+		StockLevel closetLevel = new StockLevel(keyboard, closet);
+		when(catalog.findLocation(3L)).thenReturn(closet);
+		when(stock.findByItemAndLocation(keyboard, closet)).thenReturn(Optional.of(closetLevel));
+
+		service.adjust(new StockAdjustment(1L, 2L, AdjustmentType.MOVE, 4, null, 3L), 9L);
+
+		assertThat(level.getQuantityOnHand()).isEqualTo(6);
+		assertThat(closetLevel.getQuantityOnHand()).isEqualTo(4);
+		ArgumentCaptor<InventoryTransaction> saved = ArgumentCaptor.forClass(InventoryTransaction.class);
+		verify(transactions, org.mockito.Mockito.times(2)).save(saved.capture());
+		assertThat(saved.getAllValues()).extracting(InventoryTransaction::getDelta).containsExactly(-4, 4);
+		assertThat(saved.getAllValues()).extracting(InventoryTransaction::getReason).containsOnly(TransactionReason.MOVE);
+
+		assertThatThrownBy(() -> service.adjust(new StockAdjustment(1L, 2L, AdjustmentType.MOVE, 7, null, 3L), 9L))
+			.isInstanceOf(ConflictException.class).hasMessageContaining("only 6");
+		assertThatThrownBy(() -> service.adjust(new StockAdjustment(1L, 2L, AdjustmentType.MOVE, 1, null, 2L), 9L))
+			.isInstanceOf(ConflictException.class).hasMessageContaining("different room");
+	}
+
+	@Test
 	void youCantRemoveMoreThanTheRoomHas() {
 		assertThatThrownBy(() -> service.adjust(new StockAdjustment(1L, 2L, AdjustmentType.REMOVE, 11, null), 9L))
 			.isInstanceOf(ConflictException.class).hasMessageContaining("only 10");

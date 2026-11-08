@@ -43,7 +43,7 @@ class MyPortalServiceTest {
 	@Test
 	void theWeekAddsUpShiftsSkipsDaysOffAndMarksHolidays() {
 		Map<LocalDate, ShiftCalendar.Day> days = new HashMap<>();
-		for (int i = 0; i < 5; i++) {
+		for (int i = 0; i < 7; i++) { // Monday to Sunday
 			days.put(MONDAY.plusDays(i), new ShiftCalendar.Day(List.of(), false));
 		}
 		days.put(MONDAY, new ShiftCalendar.Day(List.of(new ShiftCalendar.Shift(LocalTime.of(9, 0), LocalTime.of(13, 0), false)), false));
@@ -57,6 +57,7 @@ class MyPortalServiceTest {
 		PortalResponses.MyWeek week = service.week(7L, MONDAY.plusDays(2));
 
 		assertThat(week.start()).isEqualTo(MONDAY);
+		assertThat(week.days()).hasSize(7); // weekends can have extra shifts
 		assertThat(week.hours()).isEqualTo(5.5);
 		assertThat(week.days().get(1).dayOff()).isTrue();
 		assertThat(week.days().get(3).shifts().getFirst().extra()).isTrue();

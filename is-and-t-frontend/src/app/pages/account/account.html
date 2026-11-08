@@ -39,9 +39,18 @@
     </form>
   </section>
 
+  <section class="glass-panel rounded-3xl p-6" aria-labelledby="after-login-title">
+    <h2 id="after-login-title" class="font-semibold text-slate-900">After logging in</h2>
+    <p class="mt-1 text-sm text-slate-600">What opens when you log in, including after you were signed out for being away.</p>
+    <div class="mt-4 space-y-2 text-sm">
+      <label class="flex cursor-pointer items-center gap-2"><input type="radio" name="after-login" [checked]="afterLogin() === 'HOME'" (change)="saveAfterLogin('HOME')" /> The {{ auth.isAdmin() ? 'Dashboard' : 'Home page' }} <span class="text-slate-500">(default)</span></label>
+      <label class="flex cursor-pointer items-center gap-2"><input type="radio" name="after-login" [checked]="afterLogin() === 'LAST_PAGE'" (change)="saveAfterLogin('LAST_PAGE')" /> The page I was on last <span class="text-slate-500">(in this browser)</span></label>
+    </div>
+  </section>
+
   <section class="glass-panel rounded-3xl p-6" aria-labelledby="password-title">
     <h2 id="password-title" class="font-semibold text-slate-900">Change password</h2>
-    <form #passwordForm="ngForm" (ngSubmit)="changePassword(passwordForm)" class="mt-4 space-y-4" novalidate>
+    <form #passwordForm="ngForm" (input)="passwordError.set(null)" (change)="passwordError.set(null)" (ngSubmit)="changePassword(passwordForm)" class="mt-4 space-y-4" novalidate>
       <div>
         <label for="current-password" class="field-label">Current password</label>
         <input id="current-password" name="currentPassword" type="password" ngModel #current="ngModel" required autocomplete="current-password" class="glass-input w-full rounded-xl px-3 py-2.5 text-sm" [attr.aria-invalid]="current.invalid && (current.touched || passwordForm.submitted)" />

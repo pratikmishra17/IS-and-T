@@ -2,6 +2,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Component, booleanAttribute, inject, input, signal } from '@angular/core';
 import { FormsModule, NgForm } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
+import { LastPage } from '../../services/last-page';
 import { Auth, EndReason } from '../../services/auth';
 import { errorMessage } from '../../services/errors';
 
@@ -14,6 +15,21 @@ import { errorMessage } from '../../services/errors';
 export class Login {
   private readonly auth = inject(Auth);
   private readonly router = inject(Router);
+  private readonly lastPage = inject(LastPage);
+
+  /**
+   * The email typed so far. Kept for this browser tab (sessionStorage, never the password), so
+   * switching to the other portal's login page keeps it.
+   */
+  protected typedEmail = readTypedEmail();
+
+  protected rememberEmail(email: string): void {
+    try {
+      sessionStorage.setItem(EMAIL_KEY, email);
+    } catch {
+      // storage blocked: the other page just starts empty
+    }
+  }
 
   /** Set by the route's data ({ portal: 'admin' } on /admin/login). */
   readonly portal = input<'user' | 'admin'>('user');
@@ -43,13 +59,26 @@ export class Login {
       const admin = this.portal() === 'admin';
       await this.auth.login(form.value.email, form.value.password, admin ? 'ADMIN' : 'STUDENT');
       // A temporary password has to be replaced before anything else, on the account page.
-      const next = this.auth.mustChangePassword() ? (admin ? '/admin/account' : '/account') : (admin ? '/admin' : '/home');
-      await this.router.navigate([next]);
+      // Otherwise their home page, or the page they were on last if they chose that on the Account page.
+      const user = this.auth.currentUser();
+      const home = admin ? '/admin' : '/home';
+      const next = this.auth.mustChangePassword() ? (admin ? '/admin/account' : '/account') : (user && this.lastPage.after(user)) || home;
+      await this.router.navigateByUrl(next);
     } catch (error) {
       this.error.set(errorMessage(error));
       this.wrongPortal.set(error instanceof HttpErrorResponse && error.status === 403);
     } finally {
       this.submitting.set(false);
     }
+  }
+}
+
+const EMAIL_KEY = 'isandt.loginEmail';
+
+function readTypedEmail(): string {
+  try {
+    return sessionStorage.getItem(EMAIL_KEY) ?? '';
+  } catch {
+    return '';
   }
 }

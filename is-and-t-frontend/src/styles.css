@@ -424,6 +424,9 @@ html.theme-fade * {
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
   box-shadow: 0 30px 80px -20px rgb(0 0 0 / 0.35), inset 0 1px 0 var(--glass-highlight);
+  /* Browsers centre a <dialog> with margin: auto, but Tailwind's base styles reset every margin
+     to 0, which pinned confirm dialogs to the top-left corner. Side panels set their own margin. */
+  margin: auto;
 }
 
 .app-dialog::backdrop {
@@ -577,6 +580,35 @@ html.theme-fade * {
 /* An extra shift (that day only): dashed */
 .day-shift.is-extra {
   border-style: dashed;
+}
+
+/* Under a shift strip on the day timeline: a faint band over the shift's hours, behind the tasks,
+   so it's easy to see which tasks fall inside the shift */
+.shift-span {
+  background: color-mix(in oklab, var(--accent-from) 7%, transparent);
+  border-inline: 1px dashed color-mix(in oklab, var(--accent-from) 35%, transparent);
+}
+
+/* Dragging a task onto a person: the task being moved fades, every row it can go to gets a dashed
+   outline, and the row under the pointer fills in */
+.is-dragging {
+  opacity: 0.45;
+}
+
+.drop-ready:not(tr),
+tr.drop-ready > th {
+  outline: 2px dashed color-mix(in oklab, var(--accent-from) 45%, transparent);
+  outline-offset: -2px;
+}
+
+.drop-over:not(tr),
+tr.drop-over > * {
+  background-color: color-mix(in oklab, var(--accent-from) 16%, transparent) !important;
+}
+
+.drop-over:not(tr),
+tr.drop-over > th {
+  outline: 2px solid var(--accent-edge);
 }
 
 :root {

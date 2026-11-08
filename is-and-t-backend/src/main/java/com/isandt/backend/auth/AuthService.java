@@ -4,6 +4,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.isandt.backend.activity.ActivityLog;
 import com.isandt.backend.common.error.ConflictException;
 import com.isandt.backend.user.Account;
 import com.isandt.backend.user.AccountEmails;
@@ -36,11 +37,23 @@ public class AuthService {
 	@Transactional
 	public Role setPassword(SetPasswordRequest request) {
 		Account account = passwordTokens.redeem(request.token());
+		ActivityLog.actingAs(account); // the log names them, not whoever is logged in on this browser
 		if (!account.isActive()) {
 			throw new ConflictException("This account is not active.");
 		}
 		account.changePasswordHash(passwordEncoder.encode(request.password()));
 		return account.getRole();
+	}
+
+	/**
+	 * "Send me a new one" from a used or expired link: a fresh link goes to that account's own email
+	 * (set-password if they never set one, otherwise reset). Nothing happens for a working or unknown
+	 * link, or a disabled account; the caller always gets the same answer either way.
+	 */
+	@Transactional
+	public void renewLink(String rawToken) {
+		passwordTokens.accountForRenewal(rawToken).filter(Account::isActive)
+				.ifPresent(account -> Accounts.sendPasswordLink(account, passwordTokens, emails));
 	}
 
 	/**

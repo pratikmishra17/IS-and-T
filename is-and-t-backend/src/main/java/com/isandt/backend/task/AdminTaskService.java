@@ -17,6 +17,8 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.isandt.backend.common.text.Dates;
+import com.isandt.backend.activity.ActivityLog;
 import com.isandt.backend.calendar.HolidayService;
 import com.isandt.backend.common.error.NotFoundException;
 import com.isandt.backend.common.web.Saved;
@@ -94,8 +96,16 @@ public class AdminTaskService {
 
 	@Transactional
 	public Saved<TaskResponse> create(TaskRequest request, Long adminId) {
-		String actor = adminName(adminId);
-		Task task = tasks.save(new Task(request, zone, admins.getReferenceById(adminId)));
+		return create(request, adminName(adminId), admins.getReferenceById(adminId));
+	}
+
+	/**
+	 * Creates a task as whoever is acting (actor is their name, for the task's history). createdBy
+	 * is the admin who made it, or null when a student with edit access did.
+	 */
+	@Transactional
+	public Saved<TaskResponse> create(TaskRequest request, String actor, Admin createdBy) {
+		Task task = tasks.save(new Task(request, zone, createdBy));
 		List<String> warnings = new ArrayList<>(reservations.reserve(task.getId(), request.items()));
 		if (request.parentTaskId() != null) {
 			Task parent = find(request.parentTaskId());
@@ -114,7 +124,12 @@ public class AdminTaskService {
 	/** Edits a task; if its time changed and the assignee can't make the new time, someone else gets it. */
 	@Transactional
 	public Saved<TaskResponse> update(Long id, TaskRequest request, Long adminId) {
-		String actor = adminName(adminId);
+		return update(id, request, adminName(adminId));
+	}
+
+	/** The same, as whoever is acting (their name goes in the task's history). */
+	@Transactional
+	public Saved<TaskResponse> update(Long id, TaskRequest request, String actor) {
 		Task task = find(id);
 		task.requireOpen();
 		Instant oldStart = task.getStartAt();
@@ -122,7 +137,7 @@ public class AdminTaskService {
 		task.update(request, zone);
 		boolean rescheduled = !oldStart.equals(task.getStartAt()) || oldDuration != task.getDurationMinutes();
 		workflow.record(task, rescheduled ? TaskEventType.RESCHEDULED : TaskEventType.EDITED, actor,
-				rescheduled ? "Now " + task.date(zone) + " " + task.startTime(zone) + "–" + task.endTime(zone) : null);
+				rescheduled ? "Now " + Dates.day(task.date(zone)) + ", " + task.startTime(zone) + "–" + task.endTime(zone) : null);
 
 		List<String> warnings = new ArrayList<>(reservations.reserve(task.getId(), request.items()));
 		warnings.addAll(dateWarnings(task));
@@ -143,11 +158,16 @@ public class AdminTaskService {
 
 	@Transactional
 	public TaskResponse cancel(Long id, Long adminId) {
+		return cancel(id, adminName(adminId));
+	}
+
+	@Transactional
+	public TaskResponse cancel(Long id, String actor) {
 		Task task = find(id);
 		Student assignee = task.getAssignee();
 		task.cancel();
 		reservations.release(id);
-		workflow.record(task, TaskEventType.CANCELLED, adminName(adminId), null);
+		workflow.record(task, TaskEventType.CANCELLED, actor, null);
 		if (assignee != null) {
 			emails.cancelled(assignee, task);
 		}
@@ -176,34 +196,41 @@ public class AdminTaskService {
 	/** An admin's choice wins, even for someone not on shift; that only produces a warning. */
 	@Transactional
 	public Saved<TaskResponse> assign(Long id, AssignRequest request, Long adminId) {
-		String actor = adminName(adminId);
+		return assign(id, request, adminName(adminId));
+	}
+
+	/** The same, as whoever is acting: an admin, or a student with edit access. */
+	@Transactional
+	public Saved<TaskResponse> assign(Long id, AssignRequest request, String actor) {
 		Task task = find(id);
 		task.requireOpen();
 		Student previous = task.getAssignee();
 		List<String> warnings = new ArrayList<>();
 
 		if (request.studentId() == null) {
+			ActivityLog.about(task.getTitle() + " → nobody");
 			if (previous != null) {
 				task.unassign();
 				workflow.record(task, TaskEventType.UNASSIGNED, actor, "Taken off " + TaskWorkflow.name(previous));
-				emails.removed(previous, task, "an admin unassigned it");
+				emails.removed(previous, task, actor + " unassigned it");
 			}
 			return new Saved<>(workflow.describe(task), warnings);
 		}
 		Student student = students.findById(request.studentId()).orElseThrow(() -> new NotFoundException("Student not found."));
+		ActivityLog.about(task.getTitle() + " → " + TaskWorkflow.name(student));
 		if (previous != null && previous.getId().equals(student.getId())) {
 			return new Saved<>(workflow.describe(task), warnings);
 		}
-		boolean eligible = assigner.eligible(task, Set.of()).stream().anyMatch(s -> s.getId().equals(student.getId()));
+		String whyNot = assigner.whyNot(student, task); // worked out before the task is theirs, so it isn't "busy with itself"
 		task.assignTo(student, false);
 		workflow.record(task, TaskEventType.ASSIGNED, actor, "Assigned to " + TaskWorkflow.name(student)
-				+ (eligible ? "" : " (not on shift for the whole task, or busy then)"));
+				+ (whyNot == null ? "" : " (" + whyNot + ")"));
 		emails.assigned(student, task);
 		if (previous != null) {
-			emails.removed(previous, task, "an admin gave it to someone else");
+			emails.removed(previous, task, actor + " gave it to someone else");
 		}
-		if (!eligible) {
-			warnings.add(student.getFirstName() + " isn't on shift for the whole task, or has another task then.");
+		if (whyNot != null) {
+			warnings.add(whyNot);
 		}
 		return new Saved<>(workflow.describe(task), warnings);
 	}
@@ -224,12 +251,9 @@ public class AdminTaskService {
 	private List<String> dateWarnings(Task task) {
 		List<String> warnings = new ArrayList<>();
 		LocalDate date = task.date(zone);
-		if (date.getDayOfWeek() == DayOfWeek.SATURDAY || date.getDayOfWeek() == DayOfWeek.SUNDAY) {
-			warnings.add("That's a weekend; nobody has shifts then.");
-		}
 		String holiday = holidays.namesBetween(date, date).get(date);
 		if (holiday != null) {
-			warnings.add(date + " is a holiday (" + holiday + ").");
+			warnings.add(Dates.day(date) + " is a holiday (" + holiday + "): weekly shifts are off that day.");
 		}
 		if (task.getStartAt().isBefore(Instant.now(clock))) {
 			warnings.add("This task starts in the past.");

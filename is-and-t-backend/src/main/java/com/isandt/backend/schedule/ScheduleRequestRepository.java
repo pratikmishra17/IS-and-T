@@ -16,4 +16,6 @@ interface ScheduleRequestRepository extends JpaRepository<ScheduleRequest, Long>
 	@Query("select r from ScheduleRequest r join fetch r.student join fetch r.semester where r.status = ?1 order by r.submittedAt")
 	List<ScheduleRequest> findByStatusWithDetails(ScheduleRequestStatus status);
 
+	long countBySemester(Semester semester);
+
 }

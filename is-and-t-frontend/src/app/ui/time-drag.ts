@@ -18,7 +18,8 @@ const CLICK_MINUTES = 30;
  * A plain click picks a 30-minute slot. Presses on a task (anything marked data-task) or a button
  * are left alone, so those stay clickable.
  *
- * Usage: <div class="relative" [appTimeDrag]="{ start: 420, end: 1140 }" (picked)="...">. The
+ * Usage: <div class="relative" [appTimeDrag]="{ start: 420, end: 1140 }" (picked)="...">. Add
+ * [appTimeDragOff]="true" to switch it off (for someone who may only look). The
  * element's full width is the range (7:00 to 19:00 here). On touch screens, dragging scrolls the
  * page as usual and a tap picks 30 minutes.
  */
@@ -29,7 +30,7 @@ const CLICK_MINUTES = 30;
     '(pointermove)': 'move($event)',
     '(pointerup)': 'up()',
     '(pointercancel)': 'cancel()',
-    class: 'cursor-cell',
+    '[class.cursor-cell]': '!off()',
   },
 })
 export class TimeDrag implements OnDestroy {
@@ -38,13 +39,15 @@ export class TimeDrag implements OnDestroy {
   /** The times at the element's left and right edges, in minutes after midnight. */
   readonly range = input.required<{ start: number; end: number }>({ alias: 'appTimeDrag' });
   readonly picked = output<PickedTime>();
+  /** True: this timeline is only for looking; presses do nothing. */
+  readonly off = input(false, { alias: 'appTimeDragOff' });
 
   private anchor: number | null = null;
   private current = 0;
   private preview: HTMLElement | null = null;
 
   protected down(event: PointerEvent): void {
-    if (event.button !== 0 || (event.target as Element).closest('[data-task], button, a')) {
+    if (this.off() || event.button !== 0 || (event.target as Element).closest('[data-task], button, a')) {
       return;
     }
     this.anchor = this.current = this.timeAt(event, Math.floor);

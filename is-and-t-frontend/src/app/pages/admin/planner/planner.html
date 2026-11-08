@@ -1,19 +1,23 @@
 <div class="flex flex-wrap items-end justify-between gap-4">
   <div>
-    <h1 class="text-3xl font-semibold tracking-tight text-slate-900">Planner</h1>
+    <h1 class="text-3xl font-semibold tracking-tight text-slate-900">Shifts &amp; tasks</h1>
     <p class="mt-1 text-sm text-slate-600">Everyone’s shifts and tasks in one place, by day or by week, plus what’s waiting for your answer.</p>
   </div>
   <button type="button" class="btn submit-button text-white" (click)="newTask()"><span aria-hidden="true">+</span> New task</button>
 </div>
 
 <!-- The views -->
-<div role="tablist" aria-label="Planner views" class="mt-6 flex flex-wrap gap-1 rounded-2xl border border-white/60 bg-white/30 p-1 sm:inline-flex">
+<div role="tablist" aria-label="Shifts and tasks views" class="mt-6 flex flex-wrap gap-1 rounded-2xl border border-white/60 bg-white/30 p-1 sm:inline-flex">
   @for (tab of tabs; track tab.id) {
     <button type="button" role="tab" class="flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-medium" [class.nav-item-active]="view() === tab.id" [class.text-slate-700]="view() !== tab.id"
       [attr.aria-selected]="view() === tab.id" (click)="setView(tab.id)">
       {{ tab.label }}
-      @if (tab.id === 'requests' && requests().length > 0) { <span class="badge bg-amber-100 text-amber-900">{{ requests().length }}</span> }
-      @if (tab.id === 'timeoff' && timeOff().length > 0) { <span class="badge bg-amber-100 text-amber-900">{{ timeOff().length }}</span> }
+      <!-- How many are left: amber when something is waiting for you, grey otherwise (zero, or just today's tasks) -->
+      @if (counts()[tab.id]; as c) {
+        <span class="badge tabular-nums" [class]="c.alert ? 'bg-amber-100 text-amber-900' : 'bg-slate-200/70 text-slate-700'" [title]="c.label">
+          {{ c.count }}<span class="sr-only"> – {{ c.label }}</span>
+        </span>
+      }
     </button>
   }
 </div>
@@ -30,6 +34,10 @@
           @if (view() === 'day' && holiday()) { · <span class="font-medium text-rose-800">{{ holiday() }}</span> }
         }
       </p>
+      @if (skippedWeekend()) {
+        <p class="mt-1 text-sm text-teal-900">It’s the weekend, so this opens on next week.
+          <button type="button" class="font-medium underline" (click)="goToday()">Show this weekend</button></p>
+      }
     </div>
     <div #monthArea class="relative flex items-center gap-1">
       <button type="button" class="btn btn-quiet px-3 py-2" [attr.aria-label]="view() === 'day' ? 'Previous day' : 'Previous week'" [title]="view() === 'day' ? 'Previous day' : 'Previous week'" (click)="move(-1)">←</button>
@@ -56,124 +64,18 @@
       @case ('day') {
         @if (week(); as w) {
           <app-day-timeline [date]="date()" [week]="w" [tasks]="tasks()" [highlight]="highlight()"
-            (openTask)="openTask($event)" (editSchedule)="editSchedule($event)" (addTask)="addTaskAt($event)" />
+            (openTask)="openTask($event)" (editSchedule)="editSchedule($event)" (addTask)="addTaskAt($event)"
+            (moveTask)="moveTask($event.task, $event.student)" />
         }
       }
       @case ('week') {
         @if (week(); as w) {
-        <div class="overflow-x-auto">
-          <table class="w-full min-w-[56rem] table-fixed border-separate border-spacing-1 text-left text-sm">
-            <thead>
-              <tr>
-                <th scope="col" class="w-44 px-2 py-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Student</th>
-                @for (day of w.days; track day.date) {
-                  <th scope="col" class="rounded-xl px-1 py-1 align-top" [class.bg-teal-100]="highlighted(day.date)">
-                    <button type="button" class="block w-full rounded-lg px-1.5 py-1 text-left" [attr.aria-label]="'Open ' + (day.date | date: 'EEEE MMMM d') + ' in the day view'" title="Open this day" (click)="openDay(day.date)">
-                      <span class="block text-xs font-semibold uppercase tracking-wider" [class.text-teal-900]="highlighted(day.date)" [class.text-slate-500]="!highlighted(day.date)">{{ day.date | date: 'EEE' }}</span>
-                      <span class="block text-lg font-semibold leading-tight text-slate-900">{{ day.date | date: 'MMM d' }}</span>
-                    </button>
-                    @if (day.date === today) { <span class="badge badge-solid mt-1">Today</span> }
-                    @if (day.holiday) { <span class="badge mt-1 block w-fit bg-rose-100 text-rose-900" [title]="day.holiday">{{ day.holiday }}</span> }
-                    <!-- The hours each day's timeline covers -->
-                    <div class="relative mt-1.5 h-3.5" aria-hidden="true">
-                      @for (mark of weekMarks(); track mark) {
-                        <span class="absolute -translate-x-1/2 text-[0.6rem] font-medium tabular-nums text-slate-500" [style.left.%]="weekX(mark)">{{ shortHour(mark) }}</span>
-                      }
-                    </div>
-                  </th>
-                }
-              </tr>
-            </thead>
-            <tbody>
-              <!-- Tasks nobody has yet -->
-              <tr>
-                <th scope="row" class="rounded-xl bg-amber-50/70 px-3 py-2.5 align-top">
-                  <span class="block font-semibold text-amber-950">Unassigned</span>
-                  <span class="block text-xs text-amber-800">{{ unassigned().length }} {{ unassigned().length === 1 ? 'task needs' : 'tasks need' }} someone</span>
-                </th>
-                @for (day of w.days; track day.date) {
-                  <td class="group rounded-xl bg-amber-50/40 p-1.5 align-top" [class.ring-2]="highlighted(day.date)" [class.ring-teal-300]="highlighted(day.date)">
-                    <div class="flex min-h-14 flex-col gap-1">
-                      <div class="week-track relative h-6 rounded-md bg-white/40" [appTimeDrag]="weekRange()" (picked)="pickedOn(day.date, $event)"
-                        title="Drag (or click) to add an unassigned task at that time">
-                        <ng-container *ngTemplateOutlet="ticks; context: { $implicit: unassignedOn(day.date) }" />
-                      </div>
-                      @for (task of unassignedOn(day.date); track task.id) {
-                        <ng-container *ngTemplateOutlet="taskCard; context: { $implicit: task }" />
-                      }
-                    </div>
-                  </td>
-                }
-              </tr>
-
-              @if (w.students.length === 0) {
-                <tr><td colspan="6" class="py-12 text-center text-sm text-slate-600">No active students yet. Add them on the Users page.</td></tr>
-              }
-
-              @for (student of w.students; track student.studentId) {
-                <tr>
-                  <th scope="row" class="rounded-xl bg-white/40 px-3 py-2.5 align-top">
-                    <span class="block truncate font-semibold text-slate-900">{{ student.name }}</span>
-                    <span class="block text-xs" [class.text-rose-800]="student.overLimit" [class.font-semibold]="student.overLimit" [class.text-slate-500]="!student.overLimit">
-                      {{ student.hours }}@if (w.weeklyHourLimit) { / {{ w.weeklyHourLimit }} } h this week
-                    </span>
-                    <button type="button" class="btn btn-quiet mt-2 px-2.5 py-1 text-xs" [attr.aria-label]="'Edit ' + student.name + '’s schedule'" (click)="editSchedule(student)">
-                      <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></svg>
-                      Edit schedule
-                    </button>
-                  </th>
-                  @for (day of w.days; track day.date) {
-                    <td class="group rounded-xl bg-white/25 p-1.5 align-top" [class.ring-2]="highlighted(day.date)" [class.ring-teal-300]="highlighted(day.date)">
-                      @if (dayOf(student, day.date); as cell) {
-                        <div class="flex min-h-14 flex-col gap-1">
-                          <!-- The day as a small timeline: the shift as a band, tasks as ticks; drag to add a task -->
-                          <div class="week-track relative h-7 rounded-md bg-white/40" [appTimeDrag]="weekRange()" (picked)="pickedOn(day.date, $event, student)"
-                            [title]="'Drag (or click) to add a task for ' + student.name + ' at that time'">
-                            @for (shift of cell.shifts; track shift.start) {
-                              <div class="day-shift pointer-events-none absolute inset-y-0.5 rounded" [class.is-extra]="shift.extra"
-                                [style.left.%]="weekX(shift.start)" [style.width.%]="weekX(shift.end) - weekX(shift.start)"></div>
-                            }
-                            @for (off of cell.timeOff; track off.start) {
-                              <div class="shift-class pointer-events-none absolute inset-y-0.5 rounded" [style.left.%]="weekX(off.start)" [style.width.%]="weekX(off.end) - weekX(off.start)"></div>
-                            }
-                            <ng-container *ngTemplateOutlet="ticks; context: { $implicit: tasksOf(student, day.date) }" />
-                            @if (cell.cancelled) { <span class="pointer-events-none absolute inset-0 flex items-center justify-center text-[0.65rem] font-semibold text-slate-500">Day off</span> }
-                          </div>
-                          @if (cell.shifts.length > 0) {
-                            <p class="text-[0.7rem] font-semibold text-teal-800">
-                              @for (shift of cell.shifts; track shift.start; let last = $last) { {{ shift.extra ? 'Extra ' : '' }}{{ shift.start }}–{{ shift.end }}@if (!last) { , } }
-                            </p>
-                          }
-                          @for (off of cell.timeOff; track off.start) { <p class="text-[0.7rem] text-slate-500">Off {{ off.start }}–{{ off.end }}</p> }
-                          @for (task of tasksOf(student, day.date); track task.id) {
-                            <ng-container *ngTemplateOutlet="taskCard; context: { $implicit: task }" />
-                          }
-                        </div>
-                      }
-                    </td>
-                  }
-                </tr>
-              }
-            </tbody>
-          </table>
-        </div>
-
-        @if (weekendTasks().length > 0) {
-          <h2 class="mt-5 px-2 text-xs font-semibold uppercase tracking-widest text-slate-500">Weekend</h2>
-          <div class="mt-2 grid gap-2 px-2 sm:grid-cols-3">
-            @for (task of weekendTasks(); track task.id) { <ng-container *ngTemplateOutlet="taskCard; context: { $implicit: task }" /> }
+          <div class="flex justify-end px-2 pb-1">
+            <label class="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" [ngModel]="showWeekend()" (ngModelChange)="showWeekend.set($event)" /> Show weekend</label>
           </div>
-        }
-
-        <p class="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 px-2 text-xs text-slate-500">
-          <span class="flex items-center gap-1.5"><span class="day-shift inline-block h-3.5 w-7 rounded"></span> Shift (working)</span>
-          <span class="flex items-center gap-1.5"><span class="day-shift is-extra inline-block h-3.5 w-7 rounded"></span> Extra shift</span>
-          <span class="flex items-center gap-1.5"><span class="task-card is-assigned inline-block h-3.5 w-7 rounded"></span> Task</span>
-          <span class="flex items-center gap-1.5"><span class="task-card is-unassigned inline-block h-3.5 w-7 rounded"></span> Unassigned task</span>
-          <span class="flex items-center gap-1.5"><span class="task-card is-done inline-block h-3.5 w-7 rounded"></span> Done</span>
-          <span class="text-rose-800">Red hours: over the weekly limit</span>
-          <span>Drag across a day’s timeline to add a task for that time; a click makes a 30-minute one. Click a day’s name for its full timeline.</span>
-        </p>
+          <app-week-board [week]="w" [tasks]="tasks()" [today]="today" [focusedDay]="focusedDay()" [highlight]="highlight()" [showWeekend]="showWeekend()"
+            (openTask)="openTask($event)" (openDay)="openDay($event)" (editSchedule)="editSchedule($event)"
+            (addTask)="addTaskOn($event)" (moveTask)="moveTask($event.task, $event.student)" />
         }
       }
       @case ('list') {
@@ -231,34 +133,16 @@
           </ul>
         }
       }
-      @default {
-        <div class="p-2 sm:p-2">
-          <app-planner-inbox [mode]="$any(view())" [requests]="requests()" [timeOff]="timeOff()" (review)="reviewRequest($event)" (changed)="refreshAll()" />
+      @case ('requests') {
+        <div class="p-2">
+          <app-team-requests [changes]="changes()" [offers]="offers()" [timeOff]="timeOff()" (changed)="refreshAll()" />
+          <h2 class="mb-3 mt-8 text-lg font-semibold text-slate-900">Hours for the semester</h2>
+          <app-planner-inbox [requests]="requests()" (review)="reviewRequest($event)" />
         </div>
       }
     }
   }
 </section>
-
-<ng-template #taskCard let-task>
-  <button type="button" class="task-card block w-full rounded-lg px-2 py-1.5 text-left text-xs"
-    [class]="tone(task)"
-    [attr.data-task]="task.id" [class.task-highlight]="highlight() === task.id"
-    [attr.aria-label]="task.title + ', ' + task.startTime + ' to ' + task.endTime + ', ' + label(task.status) + (task.assignee ? ', ' + task.assignee.name : '')"
-    (click)="openTask(task)">
-    <span class="block font-semibold text-slate-500">{{ task.startTime }}–{{ task.endTime }}</span>
-    <span class="block truncate font-medium text-slate-900">{{ task.title }}</span>
-    <span class="block truncate text-slate-500">{{ task.location }}@if (task.status === 'COMPLETED') { · Done }@if (task.claimedOffShift) { · ⚠ }</span>
-  </button>
-</ng-template>
-
-<!-- Where tasks fall on a small day timeline: solid ticks over the shift band -->
-<ng-template #ticks let-tasks>
-  @for (task of tasks; track task.id) {
-    <span class="task-tick pointer-events-none absolute bottom-1 top-1 rounded-sm" [class]="tone(task)"
-      [style.left.%]="weekX(task.startTime)" [style.width]="'max(4px, ' + (weekX(task.endTime) - weekX(task.startTime)) + '%)'"></span>
-  }
-</ng-template>
 
 <app-student-schedule-panel (changed)="refreshAll()" />
 <app-task-panels (changed)="refresh($event)" />

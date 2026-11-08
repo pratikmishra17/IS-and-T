@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.isandt.backend.activity.Activity;
 import com.isandt.backend.auth.AuthenticatedUser;
 
 import jakarta.validation.Valid;
@@ -43,17 +44,20 @@ public class InventoryController {
 		return catalog.categories();
 	}
 
+	@Activity("Added an inventory category")
 	@PostMapping("/categories")
 	@ResponseStatus(HttpStatus.CREATED)
 	CategoryResponse createCategory(@Valid @RequestBody CategoryRequest request) {
 		return catalog.createCategory(request);
 	}
 
+	@Activity("Renamed an inventory category")
 	@PutMapping("/categories/{id}")
 	CategoryResponse renameCategory(@PathVariable Long id, @Valid @RequestBody CategoryRequest request) {
 		return catalog.renameCategory(id, request);
 	}
 
+	@Activity("Deleted an inventory category")
 	@DeleteMapping("/categories/{id}")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	void deleteCategory(@PathVariable Long id) {
@@ -67,17 +71,20 @@ public class InventoryController {
 		return catalog.locations();
 	}
 
+	@Activity("Added a storage location")
 	@PostMapping("/locations")
 	@ResponseStatus(HttpStatus.CREATED)
 	LocationResponse createLocation(@Valid @RequestBody LocationRequest request) {
 		return catalog.createLocation(request);
 	}
 
+	@Activity("Changed a storage location")
 	@PutMapping("/locations/{id}")
 	LocationResponse updateLocation(@PathVariable Long id, @Valid @RequestBody LocationRequest request) {
 		return catalog.updateLocation(id, request);
 	}
 
+	@Activity("Deleted a storage location")
 	@DeleteMapping("/locations/{id}")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	void deleteLocation(@PathVariable Long id) {
@@ -91,27 +98,32 @@ public class InventoryController {
 		return itemService.list();
 	}
 
+	@Activity("Added an inventory item")
 	@PostMapping("/items")
 	@ResponseStatus(HttpStatus.CREATED)
-	ItemResponse createItem(@Valid @RequestBody ItemDetails details) {
-		return itemService.create(details);
+	ItemResponse createItem(@Valid @RequestBody ItemDetails details, @AuthenticationPrincipal AuthenticatedUser admin) {
+		return stockService.createWithStock(details, admin.getId());
 	}
 
+	@Activity("Changed an inventory item")
 	@PutMapping("/items/{id}")
 	ItemResponse updateItem(@PathVariable Long id, @Valid @RequestBody ItemDetails details) {
 		return itemService.update(id, details);
 	}
 
+	@Activity("Archived an inventory item")
 	@PostMapping("/items/{id}/archive")
 	ItemResponse archiveItem(@PathVariable Long id) {
 		return itemService.archive(id);
 	}
 
+	@Activity("Restored an inventory item")
 	@PostMapping("/items/{id}/restore")
 	ItemResponse restoreItem(@PathVariable Long id) {
 		return itemService.restore(id);
 	}
 
+	@Activity("Deleted an inventory item")
 	@DeleteMapping("/items/{id}")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	void deleteItem(@PathVariable Long id) {
@@ -120,6 +132,7 @@ public class InventoryController {
 
 	// ---- Stock ----
 
+	@Activity("Changed the stock of an item")
 	@PostMapping("/stock")
 	ItemResponse adjustStock(@Valid @RequestBody StockAdjustment adjustment,
 			@AuthenticationPrincipal AuthenticatedUser admin) {

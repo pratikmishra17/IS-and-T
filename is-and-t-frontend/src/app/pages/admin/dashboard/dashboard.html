@@ -38,11 +38,15 @@
 <div class="mt-6 grid gap-4 lg:grid-cols-3">
   <section class="glass-panel rounded-3xl p-5 lg:col-span-2" aria-labelledby="attention-title">
     <h2 id="attention-title" class="font-semibold text-slate-900">Needs attention</h2>
-    @if (timeOffPending() > 0) {
-      <a routerLink="/admin/planner" [queryParams]="{ view: 'timeoff' }" class="mt-3 flex items-center justify-between rounded-2xl bg-amber-50/80 px-4 py-3 text-sm font-medium text-amber-950 hover:bg-amber-100/80">
-        {{ timeOffPending() }} time-off request{{ timeOffPending() === 1 ? '' : 's' }} to review <span aria-hidden="true">→</span>
+    @for (line of waitingFor(); track line.one) {
+      <a routerLink="/admin/planner" [queryParams]="{ view: line.view }" class="mt-2 flex items-center justify-between rounded-2xl bg-amber-50/80 px-4 py-3 text-sm font-medium text-amber-950 hover:bg-amber-100/80">
+        {{ line.count }} {{ line.count === 1 ? line.one : line.many }} {{ line.view === 'backorders' ? 'to sort out' : 'to answer' }} <span aria-hidden="true">→</span>
       </a>
     }
+    @if (!loading() && waitingFor().length === 0) {
+      <p class="mt-3 rounded-2xl bg-teal-50/70 px-4 py-3 text-sm text-teal-900">No requests waiting for an answer.</p>
+    }
+    <h3 class="mt-5 text-sm font-semibold text-slate-900">Waiting for a password</h3>
     <p class="mt-1 text-sm text-slate-600">People who were added but haven’t set their password yet. Their link expires after 48 hours.</p>
     @if (!loading() && waiting().length === 0) {
       <p class="mt-6 rounded-2xl bg-teal-50/70 px-4 py-3 text-sm text-teal-900">Everyone has set their password.</p>
@@ -82,11 +86,10 @@
       @if (lowStock().length > 5) { <p class="mt-2 text-xs text-slate-500">and {{ lowStock().length - 5 }} more</p> }
     </a>
     <a routerLink="/admin/planner" class="glass-panel block rounded-3xl p-5 hover:bg-white/70" aria-labelledby="on-shift-title">
-      <h2 id="on-shift-title" class="font-semibold text-slate-900">On shift today</h2>
-      @if (!loading() && isWeekend) {
-        <p class="mt-2 text-sm text-slate-500">No shifts on weekends.</p>
-      } @else if (!loading() && onShiftToday().length === 0) {
-        <p class="mt-2 text-sm text-slate-500">Nobody is scheduled today.</p>
+      <h2 id="on-shift-title" class="font-semibold text-slate-900">{{ showingMonday() ? 'On shift Monday' : 'On shift today' }}</h2>
+      @if (showingMonday()) { <p class="mt-1 text-xs text-teal-900">It’s the weekend and nothing is on, so this shows {{ shownDay() | date: 'EEEE, MMM d' }}.</p> }
+      @if (!loading() && onShiftToday().length === 0) {
+        <p class="mt-2 text-sm text-slate-500">Nobody is scheduled {{ showingMonday() ? 'then' : 'today' }}.</p>
       }
       <ul class="mt-2 space-y-1.5">
         @for (student of onShiftToday(); track student.name) {
@@ -99,12 +102,12 @@
     </a>
     <a routerLink="/admin/planner" class="glass-panel block rounded-3xl p-5 hover:bg-white/70" aria-labelledby="todays-tasks-title">
       <div class="flex items-center justify-between">
-        <h2 id="todays-tasks-title" class="font-semibold text-slate-900">Today’s tasks</h2>
+        <h2 id="todays-tasks-title" class="font-semibold text-slate-900">{{ showingMonday() ? 'Monday’s tasks' : 'Today’s tasks' }}</h2>
         @if (unassignedToday() > 0) { <span class="badge bg-amber-100 text-amber-900">{{ unassignedToday() }} unassigned</span> }
         @else if (todaysTasks().length > 0) { <span class="badge bg-white/70 text-slate-600">{{ todaysTasks().length }}</span> }
       </div>
       @if (!loading() && openToday().length === 0) {
-        <p class="mt-2 text-sm text-slate-500">{{ todaysTasks().length === 0 ? 'Nothing scheduled today.' : 'All of today’s tasks are done.' }}</p>
+        <p class="mt-2 text-sm text-slate-500">{{ todaysTasks().length === 0 ? 'Nothing scheduled ' + (showingMonday() ? 'then.' : 'today.') : 'All of these tasks are done.' }}</p>
       }
       <ul class="mt-2 space-y-1.5">
         @for (task of openToday().slice(0, 5); track task.id) {

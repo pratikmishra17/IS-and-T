@@ -7,7 +7,9 @@ import java.util.List;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
+import com.isandt.backend.calendar.HolidaysAdded;
 import com.isandt.backend.schedule.ShiftsChanged;
+import com.isandt.backend.user.Student;
 import com.isandt.backend.user.StudentRepository;
 import com.isandt.backend.user.StudentUnavailable;
 
@@ -43,6 +45,12 @@ class TaskAvailabilityListener {
 		students.findById(event.studentId()).ifPresent(student -> upcoming(event.studentId()).stream()
 				.filter(task -> !assigner.isOnShiftForWholeTask(student, task))
 				.forEach(task -> workflow.reassign(task, TaskWorkflow.SYSTEM, "their shifts changed and they're no longer working then")));
+	}
+
+	/** New holidays: weekly shifts are off those days, so re-check everyone's upcoming tasks. */
+	@EventListener
+	void holidaysAdded(HolidaysAdded event) {
+		students.findAll().stream().filter(Student::isActive).forEach(student -> shiftsChanged(new ShiftsChanged(student.getId())));
 	}
 
 	/** Disabled or removed: all their upcoming tasks go to someone else. */

@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.isandt.backend.activity.Activity;
 import com.isandt.backend.auth.AuthenticatedUser;
 import com.isandt.backend.auth.SessionGuardFilter;
 
@@ -27,12 +28,20 @@ public class MyAccountController {
 		this.myAccount = myAccount;
 	}
 
+	@Activity("Changed their name")
 	@PutMapping("/name")
 	AccountResponse rename(@Valid @RequestBody NameRequest request, @AuthenticationPrincipal AuthenticatedUser me) {
 		return myAccount.rename(me.getRole(), me.getId(), request);
 	}
 
+	@Activity("Chose what opens after logging in")
+	@PutMapping("/after-login")
+	AccountResponse chooseAfterLogin(@Valid @RequestBody AfterLoginRequest request, @AuthenticationPrincipal AuthenticatedUser me) {
+		return myAccount.chooseAfterLogin(me.getRole(), me.getId(), request);
+	}
+
 	/** Your other sessions are signed out; this one is kept by moving it to the new session version. */
+	@Activity("Changed their password")
 	@PostMapping("/password")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	void changePassword(@Valid @RequestBody ChangePasswordRequest request,

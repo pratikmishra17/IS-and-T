@@ -1,6 +1,8 @@
 import { DatePipe } from '@angular/common';
 import { Component, inject, output, signal } from '@angular/core';
 import { FormsModule, NgForm } from '@angular/forms';
+import { Auth } from '../services/auth';
+import { CalendarApi } from '../services/calendar';
 import { errorMessage } from '../services/errors';
 import { InventoryApi, Item, StorageLocation } from '../services/inventory';
 import { SettingsApi } from '../services/settings';
@@ -36,6 +38,8 @@ export class TaskPanels {
   private readonly settings = inject(SettingsApi);
   private readonly confirm = inject(Confirm);
   private readonly toasts = inject(Toasts);
+  private readonly auth = inject(Auth);
+  private readonly calendar = inject(CalendarApi);
   /** From Settings; pre-filled on new tasks. */
   private defaultDuration: number | null = null;
 
@@ -190,6 +194,26 @@ export class TaskPanels {
   }
 
   /** A new deployment for whatever a completed one still owes, prefilled from the original. */
+  /**
+   * The first day from tomorrow that isn't a weekend or (for admins, who can see them) a holiday:
+   * when a follow-up deployment can most likely happen. The date can still be changed.
+   */
+  private async nextWorkingDay(): Promise<string> {
+    let holidays = new Set<string>();
+    if (this.auth.isAdmin()) {
+      try {
+        holidays = new Set((await this.calendar.holidays()).map((holiday) => holiday.date));
+      } catch {
+        // no holidays then: weekends are still skipped
+      }
+    }
+    const day = new Date();
+    do {
+      day.setDate(day.getDate() + 1);
+    } while (day.getDay() === 0 || day.getDay() === 6 || holidays.has(day.toLocaleDateString('en-CA')));
+    return day.toLocaleDateString('en-CA');
+  }
+
   async openFollowUp(task: Task): Promise<void> {
     await this.loadDefaults();
     this.editingId.set(null);
@@ -197,7 +221,7 @@ export class TaskPanels {
     this.draft = {
       ...this.emptyDraft(), type: 'DEPLOYMENT', title: `Follow-up: ${task.title}`, location: task.location,
       employeeName: task.employee.name ?? '', employeeEmail: task.employee.email ?? '', employeePhone: task.employee.phone ?? '',
-      parentTaskId: task.id,
+      parentTaskId: task.id, date: await this.nextWorkingDay(),
       items: task.items.filter((i) => i.status === 'BACKORDERED')
         .map((i) => ({ itemId: i.itemId, locationId: i.locationId, quantity: i.quantityPlanned - (i.quantityUsed ?? 0) })),
     };
@@ -208,18 +232,18 @@ export class TaskPanels {
 
   protected readonly suggestions = SUPPLY_SUGGESTIONS;
 
-  /** A suggestion clicked: add it, or bring one more if it's already on the list. */
-  protected addSuggestion(name: string): void {
-    const existing = this.draft.supplies.find((supply) => supply.name.toLowerCase() === name.toLowerCase());
-    if (existing) {
-      existing.quantity = Math.min(99, existing.quantity + 1);
-    } else {
-      this.draft.supplies = [...this.draft.supplies, { name, quantity: 1 }];
-    }
+  /** A suggestion clicked: on the list with 1, or off the list if it was on. How many is set in the list. */
+  protected toggleSuggestion(name: string): void {
+    const on = this.draft.supplies.some((supply) => supply.name.toLowerCase() === name.toLowerCase());
+    this.draft.supplies = on
+      ? this.draft.supplies.filter((supply) => supply.name.toLowerCase() !== name.toLowerCase())
+      : [...this.draft.supplies, { name, quantity: 1 }];
   }
 
+  /** A blank line to type in, with the cursor put in it. */
   protected addSupplyRow(): void {
     this.draft.supplies = [...this.draft.supplies, { name: '', quantity: 1 }];
+    setTimeout(() => document.querySelector<HTMLInputElement>('input[aria-label="Thing to bring"][data-focus-new]')?.focus());
   }
 
   protected removeSupplyRow(index: number): void {
@@ -232,8 +256,32 @@ export class TaskPanels {
 
   // ---- Reserving stock ----
 
-  protected addItemRow(): void {
-    this.draft.items = [...this.draft.items, { itemId: this.items()[0]?.id ?? null, locationId: this.rooms()[0]?.id ?? null, quantity: 1 }];
+  /** Items that can be reserved: not archived, and every one already on the list (even if archived since). */
+  protected stockChoices(): Item[] {
+    return this.rooms().length === 0 ? [] : this.items().filter((item) => !item.archived || this.isPicked(item.id));
+  }
+
+  protected isPicked(itemId: number): boolean {
+    return this.draft.items.some((line) => line.itemId === itemId);
+  }
+
+  /** A stock item clicked: reserve 1 (from the room that has the most), or take it off the list. */
+  protected toggleStock(item: Item): void {
+    if (this.isPicked(item.id)) {
+      this.draft.items = this.draft.items.filter((line) => line.itemId !== item.id);
+      return;
+    }
+    const fullest = [...item.stock].sort((a, b) => b.quantity - a.quantity)[0]?.locationId ?? this.rooms()[0]?.id ?? null;
+    this.draft.items = [...this.draft.items, { itemId: item.id, locationId: fullest, quantity: 1 }];
+  }
+
+  protected itemName(itemId: number | null): string | null {
+    return this.items().find((item) => item.id === itemId)?.name ?? null;
+  }
+
+  /** How many of an item are in a room now. */
+  protected inRoom(itemId: number | null, roomId: number): number {
+    return this.items().find((item) => item.id === itemId)?.stock.find((s) => s.locationId === roomId)?.quantity ?? 0;
   }
 
   protected removeItemRow(index: number): void {

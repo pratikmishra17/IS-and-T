@@ -1,0 +1,89 @@
+<div>
+  <h1 class="text-3xl font-semibold tracking-tight text-slate-900">Activity log</h1>
+  <p class="mt-1 text-sm text-slate-600">Everything anyone has done in the app: who, what, when, and whether it worked. Looking at pages isn’t logged; logging in, out, and every change is.</p>
+</div>
+
+<section class="glass-panel mt-6 rounded-3xl p-4 sm:p-6" aria-label="Activity">
+  <div class="flex flex-wrap items-center gap-2">
+    <label class="sr-only" for="activity-search">Search</label>
+    <input id="activity-search" type="search" class="glass-input w-full rounded-xl px-3 py-2 text-sm sm:w-72" placeholder="Search a name, email, action or item"
+      [ngModel]="search()" (ngModelChange)="search.set($event)" />
+    <label class="sr-only" for="activity-who">Who</label>
+    <select id="activity-who" class="glass-input w-full rounded-xl px-3 py-2 text-sm sm:w-auto" [ngModel]="who()" (ngModelChange)="who.set($event)">
+      <option value="all">Everyone</option>
+      <option value="admins">Admins</option>
+      <option value="students">Students</option>
+      <option value="nobody">Not logged in</option>
+    </select>
+    <label class="flex cursor-pointer items-center gap-2 rounded-xl px-2 py-2 text-sm text-slate-700">
+      <input type="checkbox" class="size-4 accent-current" [ngModel]="failedOnly()" (ngModelChange)="failedOnly.set($event)" />
+      Only what didn’t work
+    </label>
+    @if (!loading()) {
+      <span class="ml-auto text-xs text-slate-500" aria-live="polite">{{ total() }} {{ total() === 1 ? 'entry' : 'entries' }}</span>
+    }
+  </div>
+
+  @if (loading()) {
+    <p class="py-12 text-center text-sm text-slate-500">Loading…</p>
+  } @else if (entries().length === 0) {
+    <p class="py-12 text-center font-medium text-slate-700">
+      {{ search() || who() !== 'all' || failedOnly() ? 'Nothing matches.' : 'Nothing has been done yet.' }}
+    </p>
+  } @else {
+    @for (group of days(); track group.day) {
+      <h2 class="mt-6 px-1 text-xs font-semibold uppercase tracking-widest text-slate-500">{{ group.label }}</h2>
+      <ol class="mt-2 divide-y divide-slate-200/60 rounded-2xl border border-white/50 bg-white/30">
+        @for (entry of group.entries; track entry.id) {
+          <li class="px-3 py-2.5 hover:bg-white/40" [attr.data-activity]="entry.id">
+            <div class="grid grid-cols-[4.5rem_1fr] items-start gap-x-3 gap-y-1 sm:grid-cols-[4.5rem_14rem_1fr_auto]">
+              <time class="pt-0.5 text-xs font-medium tabular-nums text-slate-500" [attr.datetime]="entry.at">{{ entry.at | date: 'h:mm a' }}</time>
+
+              <!-- Who -->
+              <div class="min-w-0">
+                <p class="truncate text-sm font-semibold text-slate-900">{{ entry.who ?? entry.email ?? 'Someone' }}</p>
+                <span class="badge mt-0.5" [class]="entry.role === 'ADMIN' ? 'bg-indigo-100 text-indigo-900' : entry.role === 'STUDENT' ? 'bg-teal-100 text-teal-900' : 'bg-slate-200/70 text-slate-700'">{{ roleLabel(entry) }}</span>
+              </div>
+
+              <!-- What, and to what -->
+              <div class="col-start-2 min-w-0 sm:col-start-auto">
+                <p class="text-sm text-slate-800">
+                  {{ entry.action }}@if (entry.target) { <span class="text-slate-400"> · </span><span class="font-medium text-slate-900">{{ entry.target }}</span> }
+                </p>
+                @if (!entry.succeeded) {
+                  <p class="mt-0.5 text-xs text-rose-800">Didn’t work{{ entry.reason ? ': ' + entry.reason : ' (error ' + entry.status + ')' }}</p>
+                }
+                @if (open().has(entry.id)) {
+                  <dl class="mt-1.5 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-xs text-slate-600">
+                    @if (entry.email) { <dt class="text-slate-500">Account</dt><dd class="break-all">{{ entry.email }}</dd> }
+                    <dt class="text-slate-500">Request</dt><dd class="break-all font-mono">{{ entry.method }} {{ entry.path }} → {{ entry.status }}</dd>
+                    @if (entry.ipAddress) { <dt class="text-slate-500">From</dt><dd class="font-mono">{{ entry.ipAddress }}</dd> }
+                    <dt class="text-slate-500">When</dt><dd>{{ entry.at | date: 'medium' }}</dd>
+                  </dl>
+                }
+              </div>
+
+              <!-- Result -->
+              <div class="col-start-2 flex items-center gap-2 sm:col-start-auto sm:justify-end">
+                @if (entry.succeeded) {
+                  <span class="badge bg-emerald-100 text-emerald-900">Done</span>
+                } @else {
+                  <span class="badge bg-rose-100 text-rose-900">Failed</span>
+                }
+                <button type="button" class="btn btn-quiet px-2 py-0.5 text-xs" [attr.aria-expanded]="open().has(entry.id)" (click)="toggle(entry.id)">
+                  {{ open().has(entry.id) ? 'Hide' : 'Details' }}
+                </button>
+              </div>
+            </div>
+          </li>
+        }
+      </ol>
+    }
+
+    @if (more()) {
+      <div class="mt-5 text-center">
+        <button type="button" class="btn btn-quiet" [disabled]="loadingMore()" (click)="showOlder()">{{ loadingMore() ? 'Loading…' : 'Show older' }}</button>
+      </div>
+    }
+  }
+</section>

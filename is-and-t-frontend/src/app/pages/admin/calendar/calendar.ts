@@ -56,6 +56,8 @@ export class AdminCalendar implements OnInit {
   // Holiday side panel
   protected readonly holidayPanelOpen = signal(false);
   protected holidayDraft = { name: '', from: '', to: '' };
+  /** The holiday being edited (all its days), or null when adding one. */
+  protected readonly editingHoliday = signal<HolidayGroup | null>(null);
 
   protected readonly saving = signal(false);
   protected readonly formError = signal<string | null>(null);
@@ -112,10 +114,27 @@ export class AdminCalendar implements OnInit {
     });
   }
 
+  /** Deleting a semester deletes everyone's shifts and hours for it too, so the confirmation says how many. */
   protected async deleteSemester(semester: Semester): Promise<void> {
+    let usage;
+    try {
+      usage = await this.api.semesterUsage(semester.id);
+    } catch (error) {
+      this.toasts.error(errorMessage(error));
+      return;
+    }
+    const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+    const lost = [
+      usage.weeklyShifts > 0 ? `${plural(usage.weeklyShifts, 'weekly shift', 'weekly shifts')} for ${plural(usage.studentsWithShifts, 'student', 'students')}` : '',
+      usage.studentsWithAvailability > 0 ? `the class times and hours ${plural(usage.studentsWithAvailability, 'student', 'students')} entered` : '',
+      usage.hoursRequests > 0 ? plural(usage.hoursRequests, 'hours request', 'hours requests') : '',
+      usage.shiftChanges > 0 ? plural(usage.shiftChanges, 'shift change request', 'shift change requests') : '',
+    ].filter(Boolean);
     const ok = await this.confirm.ask({
       title: `Delete ${semester.name}?`,
-      message: 'The semester and its hour limit are removed. This can’t be undone.',
+      message: lost.length
+        ? `This also deletes ${lost.join(', ')}. Their past and upcoming shifts in ${semester.name} disappear from every schedule. This can’t be undone.`
+        : 'The semester and its hour limit are removed. Nobody has shifts or hours in it yet. This can’t be undone.',
       confirmLabel: 'Delete semester',
       danger: true,
     });
@@ -134,7 +153,15 @@ export class AdminCalendar implements OnInit {
   // ---- Holidays ----
 
   protected openAddHoliday(): void {
+    this.editingHoliday.set(null);
     this.holidayDraft = { name: '', from: '', to: '' };
+    this.formError.set(null);
+    this.holidayPanelOpen.set(true);
+  }
+
+  protected openEditHoliday(group: HolidayGroup): void {
+    this.editingHoliday.set(group);
+    this.holidayDraft = { name: group.name, from: group.first, to: group.last === group.first ? '' : group.last };
     this.formError.set(null);
     this.holidayPanelOpen.set(true);
   }
@@ -144,11 +171,17 @@ export class AdminCalendar implements OnInit {
       form.control.markAllAsTouched();
       return;
     }
+    const editing = this.editingHoliday();
     await this.submit(async () => {
-      const changes = await this.api.addHoliday(this.holidayDraft.name, this.holidayDraft.from, this.holidayDraft.to || null);
+      const { name, from, to } = this.holidayDraft;
+      const changes = editing
+        ? await this.api.editHoliday(editing.days.map((day) => day.id), name, from, to || null)
+        : await this.api.addHoliday(name, from, to || null);
       this.holidays.set(await this.api.holidays());
       this.holidayPanelOpen.set(false);
-      this.toasts.success(this.describe(changes));
+      // A holiday that's already over is hidden unless "Show past holidays" is on: say where it went.
+      const past = (to || from) < this.today && !this.showPastHolidays();
+      this.toasts.success((editing ? `${name} was saved.` : this.describe(changes)) + (past ? ' It’s in the past, so it’s listed under “Show past holidays”.' : ''));
     });
   }
 

@@ -17,7 +17,7 @@ class HolidayServiceTest {
 
 	private final HolidayRepository holidays = mock(HolidayRepository.class);
 
-	private final HolidayService service = new HolidayService(holidays);
+	private final HolidayService service = new HolidayService(holidays, mock(org.springframework.context.ApplicationEventPublisher.class));
 
 	@Test
 	void aRangeAddsEveryDayAndSkipsDaysThatAreAlreadyHolidays() {

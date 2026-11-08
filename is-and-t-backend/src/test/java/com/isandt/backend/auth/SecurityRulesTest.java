@@ -3,6 +3,11 @@ package com.isandt.backend.auth;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.ArgumentMatchers.notNull;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -45,6 +50,7 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 
+import com.isandt.backend.activity.ActivityLog;
 import com.isandt.backend.calendar.HolidayService;
 import com.isandt.backend.calendar.SemesterService;
 import com.isandt.backend.inventory.CatalogService;
@@ -84,7 +90,8 @@ class SecurityRulesTest {
 
 	/** The only endpoints anyone may call without logging in. */
 	private static final Set<String> PUBLIC = Set.of("POST /api/auth/login", "POST /api/auth/set-password",
-			"POST /api/auth/forgot-password", "GET /api/auth/me", "GET /api/calendar/{token}.ics");
+			"POST /api/auth/forgot-password", "POST /api/auth/password-link/check", "POST /api/auth/password-link/renew",
+			"GET /api/auth/me", "GET /api/calendar/{token}.ics");
 
 	/** A fixed clock, so session ages are exact. */
 	@TestConfiguration
@@ -129,6 +136,9 @@ class SecurityRulesTest {
 
 	@Autowired
 	private PasswordEncoder passwordEncoder;
+
+	@MockitoBean
+	private PasswordTokenService passwordTokens;
 
 	@MockitoBean
 	private Accounts accounts;
@@ -186,6 +196,15 @@ class SecurityRulesTest {
 
 	@MockitoBean
 	private CalendarFeedService calendarFeedService;
+
+	@MockitoBean
+	private ActivityLog activityLog;
+
+	@MockitoBean
+	private com.isandt.backend.task.TeamTaskService teamTaskService;
+
+	@MockitoBean
+	private com.isandt.backend.schedule.ShiftChangeService shiftChangeService;
 
 	@MockitoBean
 	private SettingsService settingsService;
@@ -321,6 +340,37 @@ class SecurityRulesTest {
 		}
 		assertThat(status(post("/api/auth/login").with(csrf()).contentType(MediaType.APPLICATION_JSON).content(body)))
 			.isEqualTo(429);
+	}
+
+	// --- The activity log ---
+
+	@Test
+	void aFailedLoginIsLoggedWithTheAccountThatWasTriedAndWhy() throws Exception {
+		when(userDetailsService.loadUserByUsername(anyString())).thenThrow(new UsernameNotFoundException("no"));
+		String body = "{\"email\":\"Tried@csuohio.edu\",\"password\":\"wrong-password\",\"portal\":\"STUDENT\"}";
+		// From its own address, so it doesn't use up the login attempts the throttle test counts
+		mvc.perform(post("/api/auth/login").with(csrf()).with(request -> {
+			request.setRemoteAddr("10.0.0.9");
+			return request;
+		}).contentType(MediaType.APPLICATION_JSON).content(body));
+
+		// Nobody was logged in; the password itself is never passed on
+		verify(activityLog).record(isNull(), eq("Logged in"), eq("tried@csuohio.edu"), eq("POST"), eq("/api/auth/login"),
+				eq(401), notNull(), eq("10.0.0.9"));
+	}
+
+	@Test
+	void lookingAtSomethingIsNotLogged() throws Exception {
+		mvc.perform(get("/api/admin/students").session(adminSession(NOW)));
+
+		verify(activityLog, never()).record(any(), any(), any(), any(), any(), org.mockito.ArgumentMatchers.anyInt(), any(), any());
+	}
+
+	@Test
+	void loggingOutIsLogged() throws Exception {
+		mvc.perform(post("/api/auth/logout").with(csrf()).session(adminSession(NOW)));
+
+		verify(activityLog).loggedOut(any(), notNull());
 	}
 
 	@Test

@@ -6,7 +6,7 @@
   @switch (tab()) {
     @case ('items') { <button type="button" class="btn submit-button text-white" [disabled]="categories().length === 0" (click)="openAddItem()"><span aria-hidden="true">+</span> Add item</button> }
     @case ('rooms') { <button type="button" class="btn submit-button text-white" (click)="openRoom()"><span aria-hidden="true">+</span> Add room</button> }
-    @case ('categories') { <button type="button" class="btn submit-button text-white" (click)="openCategory()"><span aria-hidden="true">+</span> Add category</button> }
+    @case ('categories') { <button type="button" class="btn submit-button text-white" (click)="focusNewCategory()"><span aria-hidden="true">+</span> Add category</button> }
   }
 </div>
 
@@ -101,9 +101,12 @@
                         <button type="button" class="icon-button" [attr.aria-label]="(item.archived ? 'Restore ' : 'Archive ') + item.name" [title]="item.archived ? 'Restore' : 'Archive'" [disabled]="busyId() === item.id" (click)="archiveItem(item)">
                           <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4" /></svg>
                         </button>
-                        <button type="button" class="icon-button hover:text-rose-800" [attr.aria-label]="'Delete ' + item.name" title="Delete" [disabled]="busyId() === item.id" (click)="deleteItem(item)">
+                        <!-- Greyed out with the reason when it can't work (a disabled button shows no tooltip, so the span carries it) -->
+                        <span class="inline-flex" [title]="item.hasHistory ? 'Has stock or task history, so it can’t be deleted. Archive it instead.' : 'Delete'">
+                        <button type="button" class="icon-button hover:text-rose-800 disabled:opacity-40" [attr.aria-label]="'Delete ' + item.name + (item.hasHistory ? ' (not possible: it has history; archive it instead)' : '')" [disabled]="busyId() === item.id || item.hasHistory" (click)="deleteItem(item)">
                           <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /></svg>
                         </button>
+                        </span>
                       </div>
                     </td>
                   </tr>
@@ -140,9 +143,11 @@
                         <button type="button" class="icon-button" [attr.aria-label]="'Edit ' + room.label" title="Edit" (click)="openRoom(room)">
                           <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
                         </button>
-                        <button type="button" class="icon-button hover:text-rose-800" [attr.aria-label]="'Delete ' + room.label" title="Delete" [disabled]="busyId() === room.id" (click)="deleteRoom(room)">
+                        <span class="inline-flex" [title]="room.hasHistory ? 'Has stock history, so it can’t be deleted.' : 'Delete'">
+                        <button type="button" class="icon-button hover:text-rose-800 disabled:opacity-40" [attr.aria-label]="'Delete ' + room.label + (room.hasHistory ? ' (not possible: it has stock history)' : '')" [disabled]="busyId() === room.id || room.hasHistory" (click)="deleteRoom(room)">
                           <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /></svg>
                         </button>
+                        </span>
                       </div>
                     </td>
                   </tr>
@@ -155,6 +160,13 @@
 
       <!-- ========== Categories ========== -->
       @case ('categories') {
+        <!-- Adding a category happens right here; renaming still opens the side panel -->
+        <form class="flex flex-wrap items-start gap-2 px-3 pb-3 pt-1" (ngSubmit)="addCategoryInline()">
+          <label for="new-category" class="sr-only">New category name</label>
+          <input id="new-category" name="newCategory" [(ngModel)]="newCategory" (ngModelChange)="newCategoryError.set(null)" maxlength="100" placeholder="New category, e.g. Docking stations" class="glass-input min-w-0 flex-1 rounded-xl px-3 py-2 text-sm" />
+          <button type="submit" class="btn submit-button text-white" [disabled]="addingCategory() || !newCategory.trim()">{{ addingCategory() ? 'Adding…' : 'Add' }}</button>
+          @if (newCategoryError()) { <p role="alert" class="w-full text-sm text-rose-800">{{ newCategoryError() }}</p> }
+        </form>
         @if (categories().length === 0) {
           <p class="py-12 text-center text-sm text-slate-600">No categories yet. Start with the kinds of things you stock: Laptops, Monitors, Keyboards, Cables…</p>
         } @else {
@@ -169,9 +181,11 @@
                   <button type="button" class="icon-button" [attr.aria-label]="'Rename ' + category.name" title="Rename" (click)="openCategory(category)">
                     <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
                   </button>
-                  <button type="button" class="icon-button hover:text-rose-800" [attr.aria-label]="'Delete ' + category.name" title="Delete" [disabled]="busyId() === category.id || category.itemCount > 0" (click)="deleteCategory(category)">
+                  <span class="inline-flex" [title]="category.itemCount > 0 ? 'Has ' + category.itemCount + (category.itemCount === 1 ? ' item' : ' items') + ': move or delete them first.' : 'Delete'">
+                  <button type="button" class="icon-button hover:text-rose-800 disabled:opacity-40" [attr.aria-label]="'Delete ' + category.name + (category.itemCount > 0 ? ' (not possible: it still has items)' : '')" [disabled]="busyId() === category.id || category.itemCount > 0" (click)="deleteCategory(category)">
                     <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /></svg>
                   </button>
+                  </span>
                 </div>
               </li>
             }
@@ -213,7 +227,7 @@
 
 <app-side-panel [open]="itemPanelOpen()" [title]="editingItem() ? 'Edit ' + editingItem()!.name : 'Add an item'" (closed)="itemPanelOpen.set(false)">
   @if (itemPanelOpen()) {
-    <form #itemForm="ngForm" (ngSubmit)="saveItem(itemForm)" class="space-y-5" novalidate>
+    <form #itemForm="ngForm" (input)="formError.set(null)" (change)="formError.set(null)" (ngSubmit)="saveItem(itemForm)" class="space-y-5" novalidate>
       <div>
         <label for="item-form-category" class="field-label">Category</label>
         <select id="item-form-category" name="categoryId" [(ngModel)]="itemDraft.categoryId" required class="glass-input w-full rounded-xl px-3 py-2.5 text-sm">
@@ -252,6 +266,21 @@
         </div>
         <button type="button" class="mt-2 text-sm font-medium text-teal-900 hover:underline" (click)="addAttributeRow()">+ Add a detail</button>
       </fieldset>
+      @if (!editingItem()) {
+        <fieldset>
+          <legend class="field-label">Starting stock <span class="font-normal text-slate-500">(optional)</span></legend>
+          <div class="flex flex-wrap items-center gap-2">
+            <label class="sr-only" for="item-form-start-qty">How many</label>
+            <input id="item-form-start-qty" name="startingQuantity" type="number" min="0" max="100000" placeholder="0" [(ngModel)]="itemDraft.startingQuantity" class="glass-input w-24 rounded-xl px-3 py-2.5 text-sm" />
+            <span class="text-sm text-slate-600">in</span>
+            <label class="sr-only" for="item-form-start-room">Room</label>
+            <select id="item-form-start-room" name="startingLocationId" [(ngModel)]="itemDraft.startingLocationId" class="glass-input min-w-0 flex-1 rounded-xl px-3 py-2.5 text-sm">
+              @for (room of locations(); track room.id) { <option [ngValue]="room.id">{{ room.label }}</option> }
+            </select>
+          </div>
+          <p class="mt-1 text-xs text-slate-500">Saved as “Starting stock” in its history. Leave empty to add stock later.</p>
+        </fieldset>
+      }
       @if (itemForm.invalid && itemForm.submitted) { <p class="text-sm text-rose-800">Please choose a category, give the item a name, and a threshold of 0 or more.</p> }
       @if (formError()) { <p role="alert" class="rounded-2xl bg-rose-50/90 px-4 py-3 text-sm text-rose-900">{{ formError() }}</p> }
       <div class="flex justify-end gap-2 pt-2">
@@ -264,9 +293,9 @@
 
 <app-side-panel [open]="!!stockItem()" [title]="'Adjust stock: ' + (stockItem()?.name ?? '')" (closed)="stockItem.set(null)">
   @if (stockItem(); as item) {
-    <form #stockForm="ngForm" (ngSubmit)="saveStock(stockForm)" class="space-y-5" novalidate>
+    <form #stockForm="ngForm" (input)="formError.set(null)" (change)="formError.set(null)" (ngSubmit)="saveStock(stockForm)" class="space-y-5" novalidate>
       <div>
-        <label for="stock-room" class="field-label">Room</label>
+        <label for="stock-room" class="field-label">{{ stockDraft.type === 'MOVE' ? 'From room' : 'Room' }}</label>
         <select id="stock-room" name="locationId" [(ngModel)]="stockDraft.locationId" required class="glass-input w-full rounded-xl px-3 py-2.5 text-sm">
           @for (room of locations(); track room.id) { <option [ngValue]="room.id">{{ room.label }}</option> }
         </select>
@@ -274,25 +303,37 @@
       </div>
       <fieldset>
         <legend class="field-label">What happened?</legend>
-        <div class="grid grid-cols-3 gap-2">
-          @for (option of [{ id: 'ADD', label: 'Add' }, { id: 'REMOVE', label: 'Remove' }, { id: 'SET', label: 'Set count' }]; track option.id) {
+        <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          @for (option of [{ id: 'ADD', label: 'Add' }, { id: 'REMOVE', label: 'Remove' }, { id: 'SET', label: 'Set count' }, { id: 'MOVE', label: 'Move to room' }]; track option.id) {
             <label class="flex cursor-pointer items-center justify-center rounded-xl border px-3 py-2 text-sm font-medium" [class]="stockDraft.type === option.id ? 'border-teal-700 bg-teal-50 text-teal-950' : 'border-white/80 bg-white/50 text-slate-700'">
               <input type="radio" name="type" class="sr-only" [value]="option.id" [(ngModel)]="stockDraft.type" />{{ option.label }}
             </label>
           }
         </div>
       </fieldset>
+      @if (stockDraft.type === 'MOVE') {
+        <div>
+          <label for="stock-to-room" class="field-label">To room</label>
+          <select id="stock-to-room" name="toLocationId" [(ngModel)]="stockDraft.toLocationId" class="glass-input w-full rounded-xl px-3 py-2.5 text-sm">
+            <option [ngValue]="null" disabled>Choose a room</option>
+            @for (room of locations(); track room.id) { @if (room.id !== stockDraft.locationId) { <option [ngValue]="room.id">{{ room.label }}</option> } }
+          </select>
+        </div>
+      }
       <div>
         <label for="stock-quantity" class="field-label">{{ stockDraft.type === 'SET' ? 'Count in the room now' : 'How many' }}</label>
         <input id="stock-quantity" name="quantity" type="number" [(ngModel)]="stockDraft.quantity" #quantity="ngModel" required min="0" max="100000" class="glass-input w-32 rounded-xl px-3 py-2.5 text-sm" [attr.aria-invalid]="quantity.invalid && (quantity.touched || stockForm.submitted)" />
       </div>
       <div>
         <label for="stock-note" class="field-label">Note <span class="font-normal text-slate-500">(optional)</span></label>
-        <input id="stock-note" name="note" [(ngModel)]="stockDraft.note" maxlength="500" [placeholder]="stockDraft.type === 'ADD' ? 'Delivery from CDW' : stockDraft.type === 'REMOVE' ? 'Broken, recycled' : 'Counted on shelf'" class="glass-input w-full rounded-xl px-3 py-2.5 text-sm" />
+        <input id="stock-note" name="note" [(ngModel)]="stockDraft.note" maxlength="500" [placeholder]="stockDraft.type === 'ADD' ? 'Delivery from CDW' : stockDraft.type === 'REMOVE' ? 'Broken, recycled' : stockDraft.type === 'MOVE' ? 'For the Fenn Tower refresh' : 'Counted on shelf'" class="glass-input w-full rounded-xl px-3 py-2.5 text-sm" />
       </div>
       <p class="rounded-2xl bg-white/60 px-4 py-3 text-sm text-slate-700" aria-live="polite">
         @if (stockAfter() !== null) {
           {{ locationLabel(stockDraft.locationId) }}: <span class="font-semibold">{{ stockInRoom() }}</span> → <span class="font-semibold text-teal-900">{{ stockAfter() }}</span>
+          @if (stockDraft.type === 'MOVE') { · {{ locationLabel(stockDraft.toLocationId) }}: <span class="font-semibold text-teal-900">{{ stockInTarget() }}</span> }
+        } @else if (stockDraft.type === 'MOVE' && stockDraft.quantity !== null && (stockDraft.quantity ?? 0) <= stockInRoom()) {
+          Choose the room to move them to, and how many (more than 0).
         } @else if (stockDraft.quantity !== null) {
           <span class="text-rose-800">That’s more than the {{ stockInRoom() }} in this room.</span>
         } @else {
@@ -320,7 +361,7 @@
 
 <app-side-panel [open]="roomPanelOpen()" [title]="editingRoom() ? 'Edit ' + editingRoom()!.label : 'Add a storage room'" (closed)="roomPanelOpen.set(false)">
   @if (roomPanelOpen()) {
-    <form #roomForm="ngForm" (ngSubmit)="saveRoom(roomForm)" class="space-y-5" novalidate>
+    <form #roomForm="ngForm" (input)="formError.set(null)" (change)="formError.set(null)" (ngSubmit)="saveRoom(roomForm)" class="space-y-5" novalidate>
       <div class="grid gap-4 sm:grid-cols-[2fr_1fr]">
         <div>
           <label for="room-building" class="field-label">Building</label>
@@ -347,7 +388,7 @@
 
 <app-side-panel [open]="categoryPanelOpen()" [title]="editingCategory() ? 'Rename ' + editingCategory()!.name : 'Add a category'" (closed)="categoryPanelOpen.set(false)">
   @if (categoryPanelOpen()) {
-    <form #categoryForm="ngForm" (ngSubmit)="saveCategory(categoryForm)" class="space-y-5" novalidate>
+    <form #categoryForm="ngForm" (input)="formError.set(null)" (change)="formError.set(null)" (ngSubmit)="saveCategory(categoryForm)" class="space-y-5" novalidate>
       <div>
         <label for="category-name" class="field-label">Name</label>
         <input id="category-name" name="name" [(ngModel)]="categoryDraft" #categoryName="ngModel" required maxlength="100" placeholder="Monitors" class="glass-input w-full rounded-xl px-3 py-2.5 text-sm" [attr.aria-invalid]="categoryName.invalid && (categoryName.touched || categoryForm.submitted)" />

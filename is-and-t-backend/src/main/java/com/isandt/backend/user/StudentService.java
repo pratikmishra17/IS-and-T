@@ -6,6 +6,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.isandt.backend.activity.ActivityLog;
 import com.isandt.backend.auth.PasswordTokenService;
 import com.isandt.backend.auth.TokenPurpose;
 import com.isandt.backend.common.error.ConflictException;
@@ -74,7 +75,17 @@ public class StudentService {
 
 	@Transactional
 	public void sendPasswordLink(Long id) {
-		Accounts.sendPasswordLink(find(id), passwordTokens, emails);
+		Student student = find(id);
+		ActivityLog.about(student.getFirstName() + " " + student.getLastName());
+		Accounts.sendPasswordLink(student, passwordTokens, emails);
+	}
+
+	/** What the student may do with the team's tasks (see TaskAccess). */
+	@Transactional
+	public AccountResponse changeTaskAccess(Long id, TaskAccess access) {
+		Student student = find(id);
+		student.changeTaskAccess(access);
+		return AccountResponse.from(student);
 	}
 
 	@Transactional
@@ -99,6 +110,7 @@ public class StudentService {
 	@Transactional
 	public void remove(Long id) {
 		Student student = find(id);
+		ActivityLog.about(student.getFirstName() + " " + student.getLastName()); // gone after this, so named now
 		events.publishEvent(new StudentUnavailable(id, student.getFirstName() + " was removed"));
 		students.delete(student);
 	}

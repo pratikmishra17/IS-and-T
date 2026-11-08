@@ -5,6 +5,7 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.isandt.backend.activity.ActivityLog;
 import com.isandt.backend.common.error.ConflictException;
 import com.isandt.backend.common.error.NotFoundException;
 
@@ -63,6 +64,7 @@ public class CatalogService {
 	@Transactional
 	public void deleteCategory(Long id) {
 		Category category = findCategory(id);
+		ActivityLog.about(category.getName());
 		if (items.existsByCategory(category)) {
 			throw new ConflictException("Move or delete the items in " + category.getName() + " first.");
 		}
@@ -108,6 +110,7 @@ public class CatalogService {
 	@Transactional
 	public void deleteLocation(Long id) {
 		StorageLocation location = findLocation(id);
+		ActivityLog.about(location.label());
 		if (transactions.existsByLocation(location) || planned.existsByLocation(location)) {
 			throw new ConflictException(location.label() + " has stock history, so it can't be deleted.");
 		}
@@ -122,7 +125,8 @@ public class CatalogService {
 	private LocationResponse describe(StorageLocation location) {
 		long units = stock.findByLocation(location).stream().mapToLong(StockLevel::getQuantityOnHand).sum();
 		return new LocationResponse(location.getId(), location.getBuilding(), location.getRoom(),
-				location.getDescription(), location.label(), units);
+				location.getDescription(), location.label(), units,
+				transactions.existsByLocation(location) || planned.existsByLocation(location));
 	}
 
 	private void requireRoomFree(LocationRequest request) {

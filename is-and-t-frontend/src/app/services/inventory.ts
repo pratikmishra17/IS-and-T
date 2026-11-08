@@ -16,6 +16,8 @@ export interface StorageLocation {
   /** "Rhodes Tower 1408" */
   label: string;
   unitsStored: number;
+  /** Stock moved here, or a task planned items from here: it can't be deleted. */
+  hasHistory: boolean;
 }
 
 export type LocationDetails = Pick<StorageLocation, 'building' | 'room' | 'description'>;
@@ -37,6 +39,8 @@ export interface Item {
   available: number;
   lowStock: boolean;
   stock: { locationId: number; label: string; quantity: number }[];
+  /** Stock moved, or a task used it: it can only be archived, not deleted. */
+  hasHistory: boolean;
 }
 
 export interface ItemDetails {
@@ -46,9 +50,13 @@ export interface ItemDetails {
   model: string;
   lowStockThreshold: number;
   attributes: Record<string, string>;
+  /** Adding only: its first stock, in this room. */
+  startingQuantity?: number | null;
+  startingLocationId?: number | null;
 }
 
-export type AdjustmentType = 'ADD' | 'REMOVE' | 'SET';
+/** MOVE takes stock from the room to another room (toLocationId). */
+export type AdjustmentType = 'ADD' | 'REMOVE' | 'SET' | 'MOVE';
 
 export interface Transaction {
   id: number;
@@ -56,7 +64,7 @@ export interface Transaction {
   itemName: string;
   locationLabel: string;
   delta: number;
-  reason: 'RESTOCK' | 'REMOVAL' | 'ADJUSTMENT' | 'DEPLOYMENT';
+  reason: 'RESTOCK' | 'REMOVAL' | 'ADJUSTMENT' | 'DEPLOYMENT' | 'MOVE';
   note: string | null;
   byName: string | null;
   occurredAt: string;
@@ -115,8 +123,8 @@ export class InventoryApi {
     await firstValueFrom(this.http.delete(`${BASE}/items/${id}`));
   }
 
-  adjustStock(itemId: number, locationId: number, type: AdjustmentType, quantity: number, note: string): Promise<Item> {
-    return firstValueFrom(this.http.post<Item>(`${BASE}/stock`, { itemId, locationId, type, quantity, note }));
+  adjustStock(itemId: number, locationId: number, type: AdjustmentType, quantity: number, note: string, toLocationId?: number | null): Promise<Item> {
+    return firstValueFrom(this.http.post<Item>(`${BASE}/stock`, { itemId, locationId, type, quantity, note, toLocationId: toLocationId ?? null }));
   }
 
   /** Newest first; for one item when itemId is given. */

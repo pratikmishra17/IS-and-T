@@ -74,7 +74,7 @@ public class Accounts {
 	 * Emails a set-password link: the "you've been added" email if they never set a password,
 	 * otherwise a reset email. Used by the admin portal's "Send set-password link".
 	 */
-	static void sendPasswordLink(Account account, PasswordTokenService tokens, AccountEmails emails) {
+	public static void sendPasswordLink(Account account, PasswordTokenService tokens, AccountEmails emails) {
 		if (!account.isActive()) {
 			throw new ConflictException("Enable this account before sending a link.");
 		}

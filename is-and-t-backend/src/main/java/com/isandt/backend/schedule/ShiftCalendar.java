@@ -13,18 +13,20 @@ import java.util.Optional;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.isandt.backend.calendar.HolidayService;
 import com.isandt.backend.calendar.Semester;
 import com.isandt.backend.calendar.SemesterService;
 
 /**
  * Answers "when does each student work on each date?". A student's shifts on a date are:
  * <ol>
- * <li>their weekly shifts for that weekday, if the date is inside a semester,</li>
- * <li>none of those if the date has a day off (CANCEL),</li>
+ * <li>their weekly shifts for that weekday, if the date is inside a semester (or, for a kept day, the
+ * shifts saved for it before the weekly shifts changed: see {@link KeptDays}),</li>
+ * <li>none of those if the date has a day off (CANCEL) or is a holiday,</li>
  * <li>plus any extra shifts (EXTRA) on that date,</li>
  * <li>with any time off (OFF) cut out: 09:00–13:00 with 10:00–11:00 off becomes 09:00–10:00 and 11:00–13:00.</li>
  * </ol>
- * Nothing is stored per date: it's worked out from the weekly pattern each time it's needed.
+ * Apart from kept days, nothing is stored per date: it's worked out each time it's needed.
  */
 @Component
 public class ShiftCalendar {
@@ -52,21 +54,30 @@ public class ShiftCalendar {
 
 	private final ShiftExceptionRepository exceptions;
 
-	ShiftCalendar(SemesterService semesters, ShiftPatternRepository patterns, ShiftExceptionRepository exceptions) {
+	private final KeptDayRepository kept;
+
+	private final HolidayService holidays;
+
+	ShiftCalendar(SemesterService semesters, ShiftPatternRepository patterns, ShiftExceptionRepository exceptions,
+			KeptDayRepository kept, HolidayService holidays) {
 		this.semesters = semesters;
 		this.patterns = patterns;
 		this.exceptions = exceptions;
+		this.kept = kept;
+		this.holidays = holidays;
 	}
 
 	/**
-	 * Every listed student's shifts on every date from..to: student id → date → day. Three queries
-	 * in total (semesters, weekly shifts, exceptions), however many students and days.
+	 * Every listed student's shifts on every date from..to: student id → date → day. Five queries
+	 * in total (semesters, weekly shifts, exceptions, kept days, holidays), however many students and days.
 	 */
 	@Transactional(readOnly = true)
 	public Map<Long, Map<LocalDate, Day>> between(Collection<Long> studentIds, LocalDate from, LocalDate to) {
 		List<Semester> inRange = semesters.overlapping(from, to);
 		List<ShiftPattern> weekly = inRange.isEmpty() ? List.of() : patterns.findBySemesterIn(inRange);
 		List<ShiftException> changes = exceptions.findByDateBetween(from, to);
+		List<KeptDay> keptDays = kept.findByDateBetween(from, to);
+		Map<LocalDate, String> holidayNames = holidays.namesBetween(from, to);
 
 		Map<Long, Map<LocalDate, Day>> result = new HashMap<>();
 		for (Long studentId : studentIds) {
@@ -78,11 +89,18 @@ public class ShiftCalendar {
 						&& change.getDate().equals(day) && change.getType() == ShiftExceptionType.CANCEL);
 
 				List<Shift> shifts = new ArrayList<>();
-				if (semester.isPresent() && !cancelled) {
-					weekly.stream()
-						.filter(p -> p.studentId().equals(studentId) && p.semesterId().equals(semester.get().getId())
-								&& p.toBlock().day() == day.getDayOfWeek())
-						.forEach(p -> shifts.add(new Shift(p.toBlock().start(), p.toBlock().end(), false)));
+				if (semester.isPresent() && !cancelled && !holidayNames.containsKey(day)) {
+					Optional<KeptDay> keptDay = keptDays.stream()
+						.filter(k -> k.studentId().equals(studentId) && k.getDate().equals(day)).findFirst();
+					if (keptDay.isPresent()) {
+						keptDay.get().getShifts().forEach(h -> shifts.add(new Shift(h.start(), h.end(), false)));
+					}
+					else {
+						weekly.stream()
+							.filter(p -> p.studentId().equals(studentId) && p.semesterId().equals(semester.get().getId())
+									&& p.toBlock().day() == day.getDayOfWeek())
+							.forEach(p -> shifts.add(new Shift(p.toBlock().start(), p.toBlock().end(), false)));
+					}
 				}
 				changes.stream()
 					.filter(change -> change.studentId().equals(studentId) && change.getDate().equals(day)

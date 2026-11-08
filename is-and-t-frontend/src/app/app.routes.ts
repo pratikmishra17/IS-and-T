@@ -24,13 +24,14 @@ export const routes: Routes = [
         canActivateChild: [adminGuard],
         children: [
           { path: '', pathMatch: 'full', title: 'Dashboard · IS&T Admin', loadComponent: () => import('./pages/admin/dashboard/dashboard').then((m) => m.AdminDashboard) },
-          { path: 'planner', title: 'Planner · IS&T Admin', loadComponent: () => import('./pages/admin/planner/planner').then((m) => m.AdminPlanner) },
+          { path: 'planner', title: 'Shifts & tasks · IS&T Admin', loadComponent: () => import('./pages/admin/planner/planner').then((m) => m.AdminPlanner) },
           { path: 'users', title: 'Users · IS&T Admin', loadComponent: () => import('./pages/admin/users/users').then((m) => m.AdminUsers) },
           { path: 'calendar', title: 'Calendar · IS&T Admin', loadComponent: () => import('./pages/admin/calendar/calendar').then((m) => m.AdminCalendar) },
           // Schedules and tasks now live together on the Planner; the old addresses lead there
           { path: 'schedules', redirectTo: '/admin/planner?view=requests' },
           { path: 'tasks', redirectTo: '/admin/planner?view=list' },
           { path: 'inventory', title: 'Inventory · IS&T Admin', loadComponent: () => import('./pages/admin/inventory/inventory').then((m) => m.AdminInventory) },
+          { path: 'activity', title: 'Activity log · IS&T Admin', loadComponent: () => import('./pages/admin/activity/activity').then((m) => m.AdminActivity) },
           { path: 'settings', title: 'Settings · IS&T Admin', loadComponent: () => import('./pages/admin/settings/settings').then((m) => m.AdminSettings) },
           { path: 'account', title: 'My account · IS&T Admin', loadComponent: () => import('./pages/account/account').then((m) => m.Account) },
         ],
@@ -62,6 +63,7 @@ export const routes: Routes = [
         children: [
           { path: 'home', title: 'Home · IS&T', loadComponent: () => import('./pages/home/home').then((m) => m.Home) },
           { path: 'tasks', title: 'Tasks · IS&T', loadComponent: () => import('./pages/tasks/tasks').then((m) => m.Tasks) },
+          { path: 'team', title: 'Team · IS&T', loadComponent: () => import('./pages/team/team').then((m) => m.Team) },
           { path: 'schedule', title: 'Schedule · IS&T', loadComponent: () => import('./pages/schedule/schedule').then((m) => m.Schedule) },
           { path: 'inventory', title: 'Inventory · IS&T', loadComponent: () => import('./pages/inventory/inventory').then((m) => m.Inventory) },
           { path: 'account', title: 'Account · IS&T', loadComponent: () => import('./pages/account/account').then((m) => m.Account) },

@@ -24,6 +24,7 @@ import org.springframework.security.web.header.writers.StaticHeadersWriter;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
 
+import com.isandt.backend.activity.ActivityLog;
 import com.isandt.backend.user.Accounts;
 
 @Configuration
@@ -35,7 +36,7 @@ public class SecurityConfig {
 	 */
 	@Bean
 	SecurityFilterChain securityFilterChain(HttpSecurity http, SecurityContextRepository securityContextRepository,
-			Accounts accounts, SessionPolicy policy, Clock clock,
+			Accounts accounts, SessionPolicy policy, Clock clock, ActivityLog activity,
 			@Value("${app.security.secure-cookies:false}") boolean secureCookies) {
 		// The CSRF cookie: readable by Angular (that's how it sends the token back), SameSite=Lax so other
 		// sites' requests don't carry it, and Secure (HTTPS only) in production.
@@ -45,7 +46,7 @@ public class SecurityConfig {
 		http
 			.authorizeHttpRequests(auth -> auth
 				.requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/set-password",
-						"/api/auth/forgot-password").permitAll()
+						"/api/auth/forgot-password", "/api/auth/password-link/check", "/api/auth/password-link/renew").permitAll()
 				.requestMatchers(HttpMethod.GET, "/api/auth/me").permitAll()
 				// Calendar apps fetch feeds without logging in; the secret token in the URL protects them.
 				.requestMatchers(HttpMethod.GET, "/api/calendar/*").permitAll()
@@ -71,6 +72,8 @@ public class SecurityConfig {
 			.exceptionHandling(errors -> errors.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
 			.logout(logout -> logout
 				.logoutUrl("/api/auth/logout")
+				// Logging out never reaches a controller, so it's written to the activity log here
+				.addLogoutHandler((request, response, authentication) -> activity.loggedOut(request, authentication))
 				.logoutSuccessHandler(new HttpStatusReturningLogoutSuccessHandler()));
 		return http.build();
 	}

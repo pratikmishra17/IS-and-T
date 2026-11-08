@@ -8,5 +8,7 @@ public enum TransactionReason {
 	/** The count was corrected after a physical count. */
 	ADJUSTMENT,
 	/** Used in a completed deployment (arrives with Tasks). */
-	DEPLOYMENT
+	DEPLOYMENT,
+	/** Moved between rooms: one transaction out of the first room, one into the other. */
+	MOVE
 }

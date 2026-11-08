@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.isandt.backend.activity.Activity;
 import com.isandt.backend.auth.AuthenticatedUser;
 import com.isandt.backend.portal.CalendarFeedService.FeedLink;
 
@@ -28,6 +29,7 @@ public class CalendarFeedController {
 		return service.link(me.getId());
 	}
 
+	@Activity("Made a new calendar feed link")
 	@PostMapping("/api/me/calendar/regenerate")
 	FeedLink regenerate(@AuthenticationPrincipal AuthenticatedUser me) {
 		return service.regenerate(me.getId());

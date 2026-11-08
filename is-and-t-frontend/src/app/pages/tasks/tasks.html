@@ -128,13 +128,13 @@
           </div>
         }
         @case ('hand-off') {
-          @if (colleagues.length === 0) {
+          @if (colleagues().length === 0) {
             <p class="text-sm text-slate-600">Nobody else is on shift for the whole task and free then. You can opt out instead, so the others are asked to claim it.</p>
           } @else {
             <div>
               <label for="hand-off-to" class="field-label">Give it to</label>
               <select id="hand-off-to" class="glass-input w-full rounded-xl px-3 py-2.5 text-sm" [(ngModel)]="handOffTo" name="handOffTo">
-                @for (c of colleagues; track c.id) { <option [ngValue]="c.id">{{ c.name }}</option> }
+                @for (c of colleagues(); track c.id) { <option [ngValue]="c.id">{{ c.name }}</option> }
               </select>
               <p class="mt-1 text-xs text-slate-500">Only colleagues on shift for the whole task and free then are listed. They’ll be emailed.</p>
             </div>

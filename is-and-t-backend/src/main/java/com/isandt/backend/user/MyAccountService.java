@@ -26,6 +26,13 @@ public class MyAccountService {
 		return AccountResponse.from(account);
 	}
 
+	@Transactional
+	public AccountResponse chooseAfterLogin(Role role, Long id, AfterLoginRequest request) {
+		Account account = accounts.find(role, id);
+		account.chooseAfterLogin(request.afterLogin());
+		return AccountResponse.from(account);
+	}
+
 	/**
 	 * Requires the current password, so someone who finds a logged-in laptop can't lock the owner
 	 * out. passwordEncoder.matches() hashes the typed password the same way and compares. Every other

@@ -7,6 +7,8 @@ import { Confirm } from '../../../ui/confirm';
 import { SidePanel } from '../../../ui/side-panel';
 import { Toasts } from '../../../ui/toast';
 import { remembered } from '../../../services/remember';
+import { AdminTeamApi, TASK_ACCESS_LABEL, TaskAccess } from '../../../services/team';
+import { AdminTaskApi } from '../../../services/tasks';
 
 type StatusFilter = 'all' | 'active' | 'no-password' | 'disabled';
 type SortKey = 'name' | 'studentId' | 'status';
@@ -22,6 +24,11 @@ type SortKey = 'name' | 'studentId' | 'status';
 })
 export class AdminUsers implements OnInit {
   private readonly api = inject(Accounts);
+  private readonly teamApi = inject(AdminTeamApi);
+  private readonly taskApi = inject(AdminTaskApi);
+  /** Team access: what a student may do with tasks on their Team page (everyone can see them). */
+  protected readonly accessLevels: TaskAccess[] = ['VIEW', 'COMPLETE', 'EDIT'];
+  protected readonly accessLabel = TASK_ACCESS_LABEL;
   private readonly confirm = inject(Confirm);
   private readonly toasts = inject(Toasts);
   protected readonly auth = inject(Auth);
@@ -153,12 +160,17 @@ export class AdminUsers implements OnInit {
   protected async disable(account: User): Promise<void> {
     const ok = await this.confirm.ask({
       title: `Disable ${account.firstName} ${account.lastName}?`,
-      message: 'They won’t be able to log in. Their account stays, and you can enable it again at any time.',
+      message: `They won’t be able to log in. Their account stays, and you can enable it again at any time.${await this.tasksThatMove(account)}`,
       confirmLabel: 'Disable',
     });
     if (ok) {
       await this.run(account, () => this.api.disable(this.tab(), account.id), `${account.firstName}’s account is disabled.`);
     }
+  }
+
+  protected async setAccess(account: User, access: TaskAccess): Promise<void> {
+    await this.run(account, () => this.teamApi.setTaskAccess(account.id, access),
+      `${account.firstName} can now: ${TASK_ACCESS_LABEL[access].toLowerCase()}.`);
   }
 
   protected async enable(account: User): Promise<void> {
@@ -168,12 +180,36 @@ export class AdminUsers implements OnInit {
   protected async remove(account: User): Promise<void> {
     const ok = await this.confirm.ask({
       title: `Remove ${account.firstName} ${account.lastName}?`,
-      message: 'Their account is deleted permanently. This can’t be undone. To only block access, disable the account instead.',
+      message: `Their account is deleted permanently. This can’t be undone. To only block access, disable the account instead.${await this.tasksThatMove(account)}`,
       confirmLabel: 'Remove permanently',
       danger: true,
     });
     if (ok) {
       await this.run(account, () => this.api.remove(this.tab(), account.id), `${account.firstName} was removed.`, true);
+    }
+  }
+
+  /**
+   * A disabled or removed student's upcoming tasks go to someone else on shift (or become
+   * unassigned): " Their 3 upcoming tasks will move to others…" for the confirmation, or "" if none.
+   */
+  private async tasksThatMove(account: User): Promise<string> {
+    if (account.role === 'ADMIN') {
+      return '';
+    }
+    try {
+      const today = new Date().toLocaleDateString('en-CA');
+      const later = new Date();
+      later.setFullYear(later.getFullYear() + 1);
+      const now = new Date();
+      const upcoming = (await this.taskApi.list(today, later.toLocaleDateString('en-CA')))
+        .filter((task) => task.status === 'ASSIGNED' && task.assignee?.id === account.id && new Date(`${task.date}T${task.startTime}`) > now);
+      if (upcoming.length === 0) {
+        return ' They have no upcoming tasks.';
+      }
+      return ` Their ${upcoming.length === 1 ? 'upcoming task' : upcoming.length + ' upcoming tasks'} will move to someone else on shift, or become unassigned if nobody is free.`;
+    } catch {
+      return '';
     }
   }
 

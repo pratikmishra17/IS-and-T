@@ -15,6 +15,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.isandt.backend.activity.ActivityLog;
 import com.isandt.backend.calendar.HolidayService;
 import com.isandt.backend.calendar.Semester;
 import com.isandt.backend.calendar.SemesterService;
@@ -22,6 +23,7 @@ import com.isandt.backend.common.error.ConflictException;
 import com.isandt.backend.common.error.NotFoundException;
 import com.isandt.backend.schedule.ScheduleResponses.ExceptionInfo;
 import com.isandt.backend.schedule.ScheduleResponses.PendingRequest;
+import com.isandt.backend.schedule.ScheduleResponses.SemesterUsage;
 import com.isandt.backend.common.web.Saved;
 import com.isandt.backend.schedule.ScheduleResponses.StudentDay;
 import com.isandt.backend.schedule.ScheduleResponses.StudentSchedule;
@@ -35,13 +37,13 @@ import com.isandt.backend.user.StudentRepository;
 
 /**
  * The admin side: reviewing requests, setting weekly shifts, one-off changes, and the team week.
- * Hard rules (overlaps, weekends) block saving; soft rules (hour limit, classes, holidays) come
+ * Hard rules (overlaps, weekly shifts at weekends) block saving; soft rules (hour limit, classes, holidays) come
  * back as warnings next to what was saved.
  */
 @Service
 public class AdminScheduleService {
 
-	private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("EEE MMM d");
+	private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("EEE, MMM d", java.util.Locale.US);
 
 	private final StudentRepository students;
 
@@ -67,10 +69,17 @@ public class AdminScheduleService {
 
 	private final ApplicationEventPublisher events;
 
+	private final KeptDays keptDays;
+
+	private final AvailabilityBlockRepository availability;
+
+	private final ShiftChangeRepository shiftChanges;
+
 	AdminScheduleService(StudentRepository students, AdminRepository admins, SemesterService semesters,
 			HolidayService holidays, ShiftPatternRepository patterns, ShiftExceptionRepository exceptions,
 			ScheduleRequestRepository requests, StudentSchedules schedules, ShiftCalendar calendar,
-			ScheduleEmails emails, Clock clock, ApplicationEventPublisher events) {
+			ScheduleEmails emails, Clock clock, ApplicationEventPublisher events, KeptDays keptDays,
+			AvailabilityBlockRepository availability, ShiftChangeRepository shiftChanges) {
 		this.students = students;
 		this.admins = admins;
 		this.semesters = semesters;
@@ -83,6 +92,9 @@ public class AdminScheduleService {
 		this.emails = emails;
 		this.clock = clock;
 		this.events = events;
+		this.keptDays = keptDays;
+		this.availability = availability;
+		this.shiftChanges = shiftChanges;
 	}
 
 	@Transactional(readOnly = true)
@@ -99,6 +111,15 @@ public class AdminScheduleService {
 		return schedules.describe(student(studentId), semesters.find(semesterId));
 	}
 
+	/** What deleting this semester would delete with it, for the confirmation. */
+	@Transactional(readOnly = true)
+	public SemesterUsage semesterUsage(Long semesterId) {
+		Semester semester = semesters.find(semesterId);
+		List<ShiftPattern> weekly = patterns.findBySemesterIn(List.of(semester));
+		return new SemesterUsage(weekly.stream().map(ShiftPattern::studentId).distinct().count(), weekly.size(),
+				availability.countStudentsBySemester(semester), requests.countBySemester(semester), shiftChanges.countBySemester(semester));
+	}
+
 	/** Replaces the student's weekly shifts; with a requestId, also approves that request. */
 	@Transactional
 	public Saved<StudentSchedule> setShifts(Long studentId, Long semesterId, ShiftsRequest request, Long adminId) {
@@ -106,6 +127,7 @@ public class AdminScheduleService {
 		Semester semester = semesters.find(semesterId);
 		ShiftRules.check(request.shifts(), true, "Shift");
 
+		keptDays.beforeNewWeek(student, semester); // past days keep the shifts they had
 		patterns.deleteByStudentAndSemester(student, semester);
 		patterns.flush();
 		request.shifts().forEach(block -> patterns.save(new ShiftPattern(student, semester, block)));
@@ -132,8 +154,13 @@ public class AdminScheduleService {
 	public Saved<ExceptionInfo> addException(Long studentId, ExceptionRequest request, Long adminId) {
 		Student student = student(studentId);
 		LocalDate date = request.date();
-		if (date.getDayOfWeek() == DayOfWeek.SATURDAY || date.getDayOfWeek() == DayOfWeek.SUNDAY) {
-			throw new ConflictException("Shifts are Monday to Friday only.");
+		ActivityLog.about(student.getFirstName() + " " + student.getLastName() + ", " + date.format(DAY));
+		boolean weekend = date.getDayOfWeek() == DayOfWeek.SATURDAY || date.getDayOfWeek() == DayOfWeek.SUNDAY;
+		if (weekend && request.type() == ShiftExceptionType.CANCEL) {
+			throw new ConflictException("Weekends have no weekly shifts to call off. To undo an extra weekend shift, delete it.");
+		}
+		if (request.type() == ShiftExceptionType.CANCEL && (request.start() != null || request.end() != null)) {
+			throw new ConflictException("A whole day off doesn't have times. For part of the day, choose \"Time off (hours)\".");
 		}
 		ShiftCalendar.Day day = calendar.on(studentId, date);
 		List<String> warnings = new ArrayList<>();
@@ -178,19 +205,20 @@ public class AdminScheduleService {
 	@Transactional
 	public void deleteException(Long id) {
 		ShiftException exception = exceptions.findById(id).orElseThrow(() -> new NotFoundException("Change not found."));
+		ActivityLog.about(exception.describe());
 		exceptions.delete(exception);
 		exceptions.flush();
 		events.publishEvent(new ShiftsChanged(exception.studentId()));
 	}
 
-	/** Monday to Friday of the week containing the given date (this week if null), for every active student. */
+	/** Monday to Sunday of the week containing the given date (this week if null), for every active student. */
 	@Transactional(readOnly = true)
 	public Week week(LocalDate anyDay) {
 		if (anyDay == null) {
 			anyDay = LocalDate.now(clock);
 		}
 		LocalDate monday = anyDay.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
-		LocalDate friday = monday.plusDays(4);
+		LocalDate friday = monday.plusDays(6); // the whole week: weekends only have extra shifts, but they can
 		List<Student> team = students.findAllByOrderByLastNameAscFirstNameAsc().stream().filter(Student::isActive).toList();
 		Map<Long, Map<LocalDate, ShiftCalendar.Day>> shifts = calendar.between(team.stream().map(Student::getId).toList(),
 				monday, friday);
@@ -237,7 +265,7 @@ public class AdminScheduleService {
 			Map.Entry<LocalDate, String> first = onShiftDays.getFirst();
 			warnings.add(onShiftDays.size() + " holiday" + (onShiftDays.size() == 1 ? " falls" : "s fall")
 					+ " on scheduled days (first: " + first.getValue() + ", " + first.getKey().format(DAY)
-					+ "). Shifts still apply unless you give a day off.");
+					+ "). Weekly shifts don't apply on holidays; add an extra shift if someone should work.");
 		}
 		return warnings;
 	}
@@ -246,14 +274,14 @@ public class AdminScheduleService {
 		List<String> warnings = new ArrayList<>();
 		String holiday = holidays.namesBetween(date, date).get(date);
 		if (holiday != null) {
-			warnings.add(date.format(DAY) + " is a holiday (" + holiday + ").");
+			warnings.add(date.format(DAY) + " is a holiday (" + holiday + "): weekly shifts are off, but this extra shift still counts.");
 		}
 		Optional<Semester> semester = semesters.containing(date);
 		semester.ifPresent(s -> schedules.classes(student, s).stream().filter(extra::overlaps).findFirst()
 				.ifPresent(cls -> warnings.add("This overlaps " + student.getFirstName() + "'s class (" + cls.describe() + ").")));
 		semester.ifPresent(s -> {
 			LocalDate monday = date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
-			double hours = calendar.between(List.of(student.getId()), monday, monday.plusDays(4)).get(student.getId()).values()
+			double hours = calendar.between(List.of(student.getId()), monday, monday.plusDays(6)).get(student.getId()).values()
 					.stream().flatMap(day -> day.shifts().stream())
 					.mapToLong(shift -> Duration.between(shift.start(), shift.end()).toMinutes()).sum() / 60.0
 					+ extra.minutes() / 60.0;

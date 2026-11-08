@@ -13,6 +13,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.validation.Valid;
 
+import com.isandt.backend.activity.Activity;
+
 /** Admin portal: settings. Admins only (/api/admin/**). */
 @RestController
 @RequestMapping("/api/admin/settings")
@@ -35,12 +37,14 @@ public class SettingsController {
 		return settings.get();
 	}
 
+	@Activity("Changed the settings")
 	@PutMapping
 	SettingsResponse update(@Valid @RequestBody SettingsRequest request) {
 		return settings.update(request);
 	}
 
 	/** Sends today's digest right now, to check what it looks like. Doesn't affect the scheduled one. */
+	@Activity("Sent the daily digest now")
 	@PostMapping("/digest/send-now")
 	Map<String, Integer> sendDigestNow() {
 		return Map.of("sentTo", digest.send(LocalDate.now(clock)));
