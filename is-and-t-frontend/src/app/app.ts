@@ -1,17 +1,19 @@
-import { Component, signal } from '@angular/core';
-import { Navbar, Page } from './components/navbar/navbar';
-import { Account } from './pages/account/account';
-import { PageShell } from './components/page-shell/page-shell';
-import { Contact } from './pages/contact/contact';
-import { Login } from './pages/login/login';
-import { Logout } from './pages/logout/logout';
+import { Component, inject } from '@angular/core';
+import { LastPage } from './services/last-page';
+import { RouterOutlet } from '@angular/router';
+import { SessionWarningDialog } from './ui/session-timer';
 
+/**
+ * The root component. Each portal brings its own layout (see app.routes.ts), so this is just the
+ * outlet, plus the session warning, which applies to both portals.
+ */
 @Component({
   selector: 'app-root',
-  imports: [PageShell, Navbar, Account, Contact, Login, Logout],
+  imports: [RouterOutlet, SessionWarningDialog],
   styleUrl: './app.css',
   templateUrl: './app.html',
 })
 export class App {
-  protected readonly page = signal<Page>('login');
+  // Started here so every page visit is noted, for "open the page I was on" after logging in.
+  private readonly lastPage = inject(LastPage);
 }

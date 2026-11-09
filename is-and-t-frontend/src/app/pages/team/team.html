@@ -1,0 +1,217 @@
+<div class="flex flex-wrap items-end justify-between gap-4">
+  <div>
+    <h1 class="text-3xl font-semibold tracking-tight text-slate-900">Team</h1>
+    @if (access()) {
+      <p class="mt-1 max-w-2xl text-sm text-slate-600">
+        <span class="badge mr-1 bg-teal-100 text-teal-900">{{ accessLabel() }}</span> {{ accessHelp() }}
+      </p>
+    }
+  </div>
+  <div class="flex flex-wrap gap-2">
+    <button type="button" class="btn btn-quiet" (click)="openChange(view() === 'day' ? date() : today)">Ask for a change</button>
+    @if (canEdit()) {
+      <button type="button" class="btn submit-button text-white" (click)="newTask()"><span aria-hidden="true">+</span> New task</button>
+    }
+  </div>
+</div>
+
+<div role="tablist" aria-label="Team views" class="mt-6 flex flex-wrap gap-1 rounded-2xl border border-white/60 bg-white/30 p-1 sm:inline-flex">
+  @for (tab of tabs; track tab.id) {
+    <button type="button" role="tab" class="flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-medium" [class.nav-item-active]="view() === tab.id" [class.text-slate-700]="view() !== tab.id"
+      [attr.aria-selected]="view() === tab.id" (click)="setView(tab.id)">
+      {{ tab.label }}
+      @if (tab.id === 'requests' && pendingRequests() > 0) {
+        <span class="badge bg-amber-100 text-amber-900" [title]="pendingRequests() + ' waiting for an answer'">{{ pendingRequests() }}</span>
+      }
+    </button>
+  }
+</div>
+
+@if (view() === 'day' || view() === 'week') {
+  <div class="glass-panel mt-4 flex flex-wrap items-center justify-between gap-3 rounded-3xl px-4 py-3 sm:px-5">
+    <div>
+      <p class="text-xs font-semibold uppercase tracking-[0.18em] text-teal-800">{{ view() === 'day' ? (date() === today ? 'Today' : 'Day') : (isThisWeek() ? 'This week' : 'Week of') }}</p>
+      <p class="text-xl font-semibold tracking-tight text-slate-900">{{ title() }}</p>
+      @if (week()?.semesterName; as name) { <p class="text-sm text-slate-500">{{ name }}</p> }
+    </div>
+    <div class="flex items-center gap-1">
+      <button type="button" class="btn btn-quiet px-3 py-2" [attr.aria-label]="view() === 'day' ? 'Previous day' : 'Previous week'" (click)="move(-1)">←</button>
+      <button type="button" class="btn btn-quiet px-3 py-2" [disabled]="showingToday()" (click)="goToday()">Today</button>
+      <button type="button" class="btn btn-quiet px-3 py-2" [attr.aria-label]="view() === 'day' ? 'Next day' : 'Next week'" (click)="move(1)">→</button>
+    </div>
+  </div>
+}
+
+<section class="glass-panel mt-4 rounded-3xl p-2 sm:p-4">
+  @if (loading()) {
+    <p class="py-12 text-center text-sm text-slate-500">Loading…</p>
+  } @else {
+    @switch (view()) {
+      @case ('day') {
+        @if (week(); as w) {
+          <app-day-timeline [date]="date()" [week]="w" [tasks]="tasks()" [highlight]="highlight()"
+            [canAddTasks]="canEdit()" [canMoveTasks]="canEdit()" [canEditSchedules]="false" [ownStudentId]="me()"
+            (openTask)="openTask($event)" (addTask)="addTaskAt($event)" (moveTask)="moveTask($event.task, $event.student)" (requestChange)="changeAt($event)" />
+        }
+      }
+      @case ('week') {
+        @if (week(); as w) {
+          <app-week-board [week]="w" [tasks]="tasks()" [today]="today" [highlight]="highlight()"
+            [canAddTasks]="canEdit()" [canMoveTasks]="canEdit()" [canEditSchedules]="false" [ownStudentId]="me()"
+            (openTask)="openTask($event)" (openDay)="openDay($event)" (addTask)="addTaskOn($event)"
+            (moveTask)="moveTask($event.task, $event.student)" (requestChange)="changeOn($event)" />
+        }
+      }
+      @case ('tasks') {
+        <div class="flex flex-wrap items-center gap-2 px-2">
+          <label class="sr-only" for="team-semester">Semester</label>
+          <select id="team-semester" class="glass-input rounded-xl px-3 py-2 text-sm" [ngModel]="semesterId()" (ngModelChange)="pickSemester($event)">
+            @for (s of semesters(); track s.id) { <option [ngValue]="s.id">{{ s.name }}</option> }
+          </select>
+          <label class="sr-only" for="team-filter">Show</label>
+          <select id="team-filter" class="glass-input rounded-xl px-3 py-2 text-sm" [ngModel]="listFilter()" (ngModelChange)="listFilter.set($event)">
+            <option value="open">Still to do</option>
+            <option value="unassigned">Nobody has it yet</option>
+            <option value="mine">Mine</option>
+            <option value="all">Everything</option>
+          </select>
+          <label class="sr-only" for="team-search">Search</label>
+          <input id="team-search" type="search" class="glass-input w-full rounded-xl px-3 py-2 text-sm sm:w-64" placeholder="Search a task, place or person" [ngModel]="search()" (ngModelChange)="search.set($event)" />
+          <span class="ml-auto text-xs text-slate-500">{{ listed().length }} {{ listed().length === 1 ? 'task' : 'tasks' }}</span>
+        </div>
+        @if (semesters().length === 0) {
+          <p class="py-12 text-center text-sm text-slate-600">There’s no semester yet.</p>
+        } @else if (listed().length === 0) {
+          <p class="py-12 text-center text-sm text-slate-600">No tasks match.</p>
+        } @else {
+          <div class="relative mt-3 overflow-x-auto">
+            <!-- Phones: two columns, with who and the status under the task's name. From sm (640px) up: all four. -->
+            <table class="w-full text-left text-sm sm:min-w-[40rem]">
+              <thead class="border-b border-slate-200/80 text-xs uppercase tracking-wider text-slate-500">
+                <tr>
+                  <th scope="col" class="px-3 py-3 font-semibold">When</th>
+                  <th scope="col" class="px-3 py-3 font-semibold">Task</th>
+                  <th scope="col" class="hidden px-3 py-3 font-semibold sm:table-cell">Who</th>
+                  <th scope="col" class="hidden px-3 py-3 font-semibold sm:table-cell">Status</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-200/60">
+                @for (task of listed(); track task.id) {
+                  <tr class="cursor-pointer hover:bg-white/40" [class.bg-teal-50/60]="isMine(task)" (click)="openTask(task)">
+                    <td class="whitespace-nowrap px-3 py-3 text-slate-700">{{ task.date | date: 'EEE MMM d' }}<br /><span class="text-xs text-slate-500">{{ task.startTime }}–{{ task.endTime }}</span></td>
+                    <td class="px-3 py-3"><span class="font-medium text-slate-900">{{ task.title }}</span><br /><span class="text-xs text-slate-500">{{ task.location }}</span>
+                      <span class="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-700 sm:hidden">
+                        {{ isMine(task) ? 'You' : task.assignee?.name ?? 'Nobody yet' }}
+                        <span class="badge" [class]="statusTone(task)">{{ label(task.status) }}</span>
+                      </span>
+                    </td>
+                    <td class="hidden px-3 py-3 text-slate-700 sm:table-cell">{{ isMine(task) ? 'You' : task.assignee?.name ?? '—' }}</td>
+                    <td class="hidden px-3 py-3 sm:table-cell"><span class="badge" [class]="statusTone(task)">{{ label(task.status) }}</span></td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      }
+      @case ('requests') {
+        <div class="grid gap-6 p-2 lg:grid-cols-2">
+          <div>
+            <div class="flex items-center justify-between gap-2">
+              <h2 class="text-lg font-semibold text-slate-900">Time off and shift changes</h2>
+              <button type="button" class="btn btn-quiet px-3 py-1.5 text-sm" (click)="openChange(today)">Ask for a change</button>
+            </div>
+            <app-my-requests #myRequests (pending)="changesPending.set($event)" />
+          </div>
+          <div>
+            <h2 class="text-lg font-semibold text-slate-900">Tasks you offered to take</h2>
+            @if (offers().length === 0) {
+              <p class="mt-3 text-sm text-slate-600">None yet. Open someone else’s task and choose “I can do this”.</p>
+            }
+            <ul class="mt-3 space-y-2">
+              @for (o of offers(); track o.id) {
+                <li class="rounded-2xl border border-white/50 bg-white/40 p-3">
+                  <div class="flex items-start justify-between gap-2">
+                    <div>
+                      <p class="font-medium text-slate-900">{{ o.taskTitle }}</p>
+                      <p class="text-sm text-slate-700">{{ o.date | date: 'EEE MMM d' }}, {{ o.startTime }}–{{ o.endTime }}@if (o.currentAssignee) { · now {{ o.currentAssignee }}’s }</p>
+                      @if (o.note) { <p class="mt-1 text-xs text-slate-500">“{{ o.note }}”</p> }
+                    </div>
+                    <span class="badge shrink-0" [class]="o.status === 'PENDING' ? 'bg-amber-100 text-amber-900' : o.status === 'ACCEPTED' ? 'bg-emerald-100 text-emerald-900' : 'bg-slate-200 text-slate-700'">
+                      {{ o.status === 'PENDING' ? 'Waiting' : o.status === 'ACCEPTED' ? 'It’s yours' : o.status === 'DECLINED' ? 'Declined' : o.status === 'CLOSED' ? 'No longer needed' : 'Withdrawn' }}
+                    </span>
+                  </div>
+                  @if (o.status === 'PENDING') {
+                    <button type="button" class="btn btn-quiet mt-2 px-2.5 py-1 text-xs" (click)="withdrawOffer(o)">Withdraw</button>
+                  }
+                </li>
+              }
+            </ul>
+          </div>
+        </div>
+      }
+    }
+  }
+</section>
+
+<!-- A task: what it is, and what you may do with it -->
+<app-side-panel [open]="!!selected()" [title]="selected()?.title ?? 'Task'" (closed)="selected.set(null)">
+  @if (selected(); as task) {
+    <div class="space-y-4 text-sm">
+      <dl class="grid grid-cols-[6rem_1fr] gap-x-3 gap-y-1.5">
+        <dt class="text-slate-500">When</dt><dd class="text-slate-900">{{ task.date | date: 'EEEE, MMM d' }}, {{ task.startTime }}–{{ task.endTime }}</dd>
+        <dt class="text-slate-500">Where</dt><dd class="text-slate-900">{{ task.location }}</dd>
+        <dt class="text-slate-500">Who</dt><dd class="text-slate-900">{{ isMine(task) ? 'You' : task.assignee?.name ?? 'Nobody yet' }}</dd>
+        <dt class="text-slate-500">Status</dt><dd><span class="badge bg-slate-200 text-slate-700">{{ label(task.status) }}</span></dd>
+        @if (task.employee.name) { <dt class="text-slate-500">For</dt><dd class="text-slate-900">{{ task.employee.name }}</dd> }
+        @if (task.supplies.length) { <dt class="text-slate-500">Bring</dt><dd class="text-slate-900">@for (s of task.supplies; track $index; let last = $last) { {{ s.quantity }} × {{ s.name }}@if (!last) { , } }</dd> }
+      </dl>
+      @if (task.description) { <p class="whitespace-pre-line text-slate-700">{{ task.description }}</p> }
+
+      @if (isOpen(task)) {
+        @if (!isMine(task)) {
+          <div class="rounded-2xl border border-teal-200/70 bg-teal-50/60 p-3">
+            <p class="font-medium text-teal-950">I can do this</p>
+            <p class="mt-0.5 text-xs text-teal-900">{{ task.assignee ? 'It’s ' + task.assignee.name + '’s now, so an admin decides.' : 'Nobody has it, so it becomes yours straight away.' }}</p>
+            @if (task.assignee) {
+              <label class="mt-2 block text-xs text-slate-600" for="offer-note">Note for the admins (optional)</label>
+              <input id="offer-note" class="glass-input mt-1 w-full rounded-xl px-3 py-2" [(ngModel)]="offerNote" placeholder="I’m on shift then" />
+            }
+            <button type="button" class="btn submit-button mt-2 text-white" [disabled]="busy()" (click)="offer(task)">{{ task.assignee ? 'Offer to take it' : 'Take it' }}</button>
+          </div>
+        }
+        @if (isMine(task) || canComplete()) {
+          <div class="rounded-2xl border border-white/60 bg-white/40 p-3">
+            <p class="font-medium text-slate-900">Finished?</p>
+            @if (!isMine(task) && task.assignee) { <p class="mt-0.5 text-xs text-slate-600">It stays {{ task.assignee.name }}’s; its history says you marked it.</p> }
+            <label class="mt-2 block text-xs text-slate-600" for="outcome-notes">Notes (needed if it couldn’t be done)</label>
+            <textarea id="outcome-notes" rows="2" class="glass-input mt-1 w-full rounded-xl px-3 py-2" [(ngModel)]="outcomeNotes"></textarea>
+            <div class="mt-2 flex flex-wrap gap-2">
+              <button type="button" class="btn submit-button text-white" [disabled]="busy()" (click)="finish(task, true)">Mark done</button>
+              <button type="button" class="btn btn-quiet" [disabled]="busy()" (click)="finish(task, false)">Couldn’t do it</button>
+            </div>
+          </div>
+        }
+        @if (canEdit()) {
+          <button type="button" class="btn btn-quiet" (click)="editTask(task)">Edit, assign or cancel</button>
+        }
+      }
+
+      @if (history().length) {
+        <div>
+          <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">History</p>
+          <ol class="mt-2 space-y-1 text-xs text-slate-600">
+            @for (event of history(); track $index) {
+              <li>{{ event.occurredAt | date: 'MMM d, h:mm a' }} · {{ event.actor }} · {{ eventLabel(event.type) }}@if (event.detail) { · {{ event.detail }} }</li>
+            }
+          </ol>
+        </div>
+      }
+    </div>
+  }
+</app-side-panel>
+
+<!-- Asking for a change (time off or different hours) -->
+<app-change-request (sent)="requestSent()" />
+
+<app-task-panels (changed)="refresh($event)" />

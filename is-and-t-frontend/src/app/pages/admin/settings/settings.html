@@ -1,0 +1,49 @@
+<h1 class="text-3xl font-semibold tracking-tight text-slate-900">Settings</h1>
+<p class="mt-1 text-sm text-slate-600">How the portal behaves for everyone.</p>
+
+@if (!settings()) {
+  <p class="mt-6 text-sm text-slate-500">{{ error() ?? 'Loading…' }}</p>
+} @else {
+  <form #settingsForm="ngForm" (input)="error.set(null)" (change)="error.set(null)" (ngSubmit)="save(settingsForm)" class="mt-6 grid gap-4 lg:grid-cols-2" novalidate>
+    <section class="glass-panel rounded-3xl p-6" aria-labelledby="digest-title">
+      <h2 id="digest-title" class="font-semibold text-slate-900">Daily digest</h2>
+      <p class="mt-1 text-sm text-slate-600">An email on weekday mornings with today’s unassigned tasks, low stock, and backorders that are back in stock.</p>
+
+      <div class="mt-4">
+        <label for="digest-time" class="field-label">Send at (Cleveland time)</label>
+        <input id="digest-time" name="digestTime" type="time" required [(ngModel)]="draft.digestTime" class="glass-input w-36 rounded-xl px-3 py-2.5 text-sm" />
+      </div>
+
+      <fieldset class="mt-4">
+        <legend class="field-label">Who receives it</legend>
+        <ul class="space-y-2">
+          @for (admin of settings()!.admins; track admin.id) {
+            <li>
+              <label class="flex cursor-pointer items-start gap-3 rounded-xl px-2 py-1.5 hover:bg-white/50" [class.opacity-60]="!admin.active">
+                <input type="checkbox" class="mt-0.5 size-4 accent-teal-800" [checked]="draft.recipients.has(admin.id)" [disabled]="!admin.active" (change)="toggleRecipient(admin.id, $any($event.target).checked)" />
+                <span class="text-sm"><span class="font-medium text-slate-900">{{ admin.name }}</span><br /><span class="text-slate-500">{{ admin.email }}{{ admin.active ? '' : ' · disabled' }}</span></span>
+              </label>
+            </li>
+          }
+        </ul>
+      </fieldset>
+
+      <button type="button" class="btn btn-quiet mt-4" [disabled]="sending()" (click)="sendNow()">{{ sending() ? 'Sending…' : 'Send today’s digest now' }}</button>
+      <p class="mt-1 text-xs text-slate-500">To see what it looks like. The scheduled one still goes out as usual.</p>
+    </section>
+
+    <section class="glass-panel rounded-3xl p-6" aria-labelledby="tasks-settings-title">
+      <h2 id="tasks-settings-title" class="font-semibold text-slate-900">Tasks</h2>
+      <div class="mt-4">
+        <label for="default-duration" class="field-label">Default length of a new task (minutes)</label>
+        <input id="default-duration" name="defaultTaskDuration" type="number" min="5" max="600" required [(ngModel)]="draft.defaultTaskDuration" class="glass-input w-28 rounded-xl px-3 py-2.5 text-sm" />
+        <p class="mt-1 text-xs text-slate-500">Including travel time. Can be changed on each task.</p>
+      </div>
+    </section>
+
+    <div class="flex flex-col items-end gap-2 lg:col-span-2">
+      @if (error()) { <p role="alert" class="w-full rounded-2xl bg-rose-50/90 px-4 py-3 text-sm text-rose-900">{{ error() }}</p> }
+      <button type="submit" class="btn submit-button text-white" [disabled]="saving()">{{ saving() ? 'Saving…' : 'Save settings' }}</button>
+    </div>
+  </form>
+}

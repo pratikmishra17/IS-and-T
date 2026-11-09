@@ -1,0 +1,85 @@
+<div class="glass-page relative isolate min-h-svh">
+  @if (auth.isAdmin()) {
+    <!-- Small screens: a top bar with a menu button -->
+    <header class="glass-bar sticky top-0 z-30 flex items-center justify-between border-b px-4 py-3 lg:hidden">
+      <ng-container *ngTemplateOutlet="brand" />
+      <div class="flex items-center gap-1">
+        <app-theme-toggle />
+        <button type="button" class="icon-button" aria-controls="admin-sidebar" [attr.aria-expanded]="menuOpen()" aria-label="Menu" (click)="menuOpen.set(!menuOpen())">
+          <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
+        </button>
+      </div>
+    </header>
+
+    @if (menuOpen()) {
+      <div class="fixed inset-0 z-30 bg-black/40 backdrop-blur-sm lg:hidden" aria-hidden="true" (click)="menuOpen.set(false)"></div>
+    }
+
+    <div class="lg:flex">
+      <aside id="admin-sidebar" class="admin-sidebar fixed inset-y-0 left-0 z-40 w-72 p-3 lg:sticky lg:top-0 lg:block lg:h-svh lg:w-64 lg:shrink-0"
+        [class.hidden]="!menuOpen()" [class.is-collapsed]="collapsed()">
+        <nav aria-label="Admin portal" class="glass-panel flex h-full flex-col rounded-3xl p-3">
+          <div class="sidebar-head px-1 pb-4 pt-1">
+            <ng-container *ngTemplateOutlet="brand" />
+          </div>
+
+          <ul class="flex flex-1 flex-col gap-1">
+            @for (item of nav; track item.label) {
+              <li>
+                <a [routerLink]="item.path" routerLinkActive="nav-item-active" [routerLinkActiveOptions]="{ exact: item.path === '/admin' }" ariaCurrentWhenActive="page"
+                  class="nav-item" [attr.title]="collapsed() ? item.label : null" (click)="menuOpen.set(false)">
+                  <svg aria-hidden="true" class="shrink-0" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path [attr.d]="item.icon" /></svg>
+                  <span class="sidebar-label">{{ item.label }}</span>
+                </a>
+              </li>
+            }
+          </ul>
+
+          <div class="mt-4 flex flex-col gap-1 border-t border-slate-200/70 pt-3">
+            <app-theme-toggle [label]="true" class="block" />
+            <app-account-menu placement="above" />
+          </div>
+        </nav>
+
+        <!-- Large screens: a handle on the sidebar's edge shrinks it to icons, and expands it again -->
+        <button type="button" class="sidebar-handle glass-panel absolute right-3 top-9 z-10 hidden size-8 translate-x-1/2 cursor-pointer items-center justify-center rounded-full text-slate-700 hover:text-teal-800 focus-visible:outline-2 focus-visible:outline-teal-800 lg:flex"
+          aria-controls="admin-sidebar" [attr.aria-expanded]="!collapsed()" [attr.aria-label]="collapsed() ? 'Expand sidebar' : 'Collapse sidebar'"
+          [attr.title]="collapsed() ? 'Expand sidebar' : 'Collapse sidebar'" (click)="toggleCollapsed()">
+          <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path [attr.d]="collapsed() ? 'm9 6 6 6-6 6' : 'm15 6-6 6 6 6'" />
+          </svg>
+        </button>
+      </aside>
+
+      <main class="min-w-0 flex-1 px-4 py-6 sm:px-8 lg:py-10">
+        <div class="mx-auto max-w-6xl">
+          <router-outlet />
+        </div>
+      </main>
+    </div>
+  } @else {
+    <!-- Admin login: no sidebar, just the brand above the form -->
+    <div class="flex min-h-svh flex-col items-center px-4 py-10">
+      <div class="flex w-full max-w-lg items-center justify-between">
+        <ng-container *ngTemplateOutlet="brand" />
+        <app-theme-toggle />
+      </div>
+      <main class="flex w-full flex-1 items-center justify-center py-10">
+        <div class="w-full max-w-lg"><router-outlet /></div>
+      </main>
+    </div>
+  }
+
+  <app-confirm-dialog />
+  <app-toaster />
+</div>
+
+<ng-template #brand>
+  <a routerLink="/admin" class="flex w-fit items-center gap-2.5 rounded-lg focus-visible:outline-2 focus-visible:outline-teal-800" aria-label="IS and T admin portal">
+    <span class="brand-mark flex size-9 shrink-0 items-center justify-center rounded-xl text-teal-800" aria-hidden="true">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="m12 3 9 5-9 5-9-5 9-5Zm-9 9 9 5 9-5M3 16l9 5 9-5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></svg>
+    </span>
+    <span class="sidebar-label whitespace-nowrap font-semibold tracking-wide text-slate-900">IS &amp; T</span>
+    <span class="sidebar-label badge badge-solid uppercase tracking-widest">Admin</span>
+  </a>
+</ng-template>

@@ -1,0 +1,424 @@
+<div class="flex flex-wrap items-end justify-between gap-4">
+  <div>
+    <h1 class="text-3xl font-semibold tracking-tight text-slate-900">Inventory</h1>
+    <p class="mt-1 text-sm text-slate-600">What’s in the back rooms. Every change to a count is recorded in the history.</p>
+  </div>
+  @switch (tab()) {
+    @case ('items') { <button type="button" class="btn submit-button text-white" [disabled]="categories().length === 0" (click)="openAddItem()"><span aria-hidden="true">+</span> Add item</button> }
+    @case ('rooms') { <button type="button" class="btn submit-button text-white" (click)="openRoom()"><span aria-hidden="true">+</span> Add room</button> }
+    @case ('categories') { <button type="button" class="btn submit-button text-white" (click)="focusNewCategory()"><span aria-hidden="true">+</span> Add category</button> }
+  }
+</div>
+
+<div role="tablist" aria-label="Inventory sections" class="mt-6 inline-flex flex-wrap gap-1 rounded-2xl border border-white/60 bg-white/30 p-1">
+  @for (t of [{ id: 'items', label: 'Items' }, { id: 'rooms', label: 'Rooms' }, { id: 'categories', label: 'Categories' }, { id: 'history', label: 'History' }]; track t.id) {
+    <button type="button" role="tab" class="rounded-xl px-4 py-2 text-sm font-medium text-slate-700 hover:bg-white/60" [class.bg-white]="tab() === t.id" [class.shadow-sm]="tab() === t.id" [attr.aria-selected]="tab() === t.id" (click)="switchTab($any(t.id))">
+      {{ t.label }}
+      @if (t.id === 'items' && lowStockCount() > 0) { <span class="badge ml-1 bg-amber-100 text-amber-900">{{ lowStockCount() }} low</span> }
+    </button>
+  }
+</div>
+
+<section class="glass-panel mt-4 rounded-3xl p-4 sm:p-6">
+  @if (loading()) {
+    <p class="py-12 text-center text-sm text-slate-500">Loading…</p>
+  } @else {
+    @switch (tab()) {
+      <!-- ========== Items ========== -->
+      @case ('items') {
+        @if (categories().length === 0 || locations().length === 0) {
+          <div class="mb-4 rounded-2xl bg-amber-50/80 px-4 py-3 text-sm text-amber-950">
+            Getting started: add at least one
+            @if (categories().length === 0) { <button type="button" class="font-semibold underline" (click)="switchTab('categories')">category</button> }
+            @if (categories().length === 0 && locations().length === 0) { and one }
+            @if (locations().length === 0) { <button type="button" class="font-semibold underline" (click)="switchTab('rooms')">storage room</button> }
+            first.
+          </div>
+        }
+        <div class="flex flex-col gap-2 lg:flex-row lg:items-center">
+          <label class="sr-only" for="item-search">Search items</label>
+          <input id="item-search" type="search" placeholder="Search name, maker, model" class="glass-input w-full rounded-xl px-3 py-2 text-sm lg:w-72" [ngModel]="search()" (ngModelChange)="search.set($event)" />
+          <label class="sr-only" for="item-category">Category</label>
+          <select id="item-category" class="glass-input w-full rounded-xl px-3 py-2 text-sm lg:w-auto" [ngModel]="categoryFilter()" (ngModelChange)="categoryFilter.set($event)">
+            <option [ngValue]="'all'">All categories</option>
+            @for (category of categories(); track category.id) { <option [ngValue]="category.id">{{ category.name }}</option> }
+          </select>
+          <div class="flex gap-4 lg:ml-auto">
+            <label class="inline-flex cursor-pointer items-center gap-2 text-sm text-slate-600"><input type="checkbox" class="size-4 accent-teal-800" [ngModel]="lowStockOnly()" (ngModelChange)="lowStockOnly.set($event)" /> Low stock only</label>
+            <label class="inline-flex cursor-pointer items-center gap-2 text-sm text-slate-600"><input type="checkbox" class="size-4 accent-teal-800" [ngModel]="showArchived()" (ngModelChange)="showArchived.set($event)" /> Show archived</label>
+          </div>
+        </div>
+
+        @if (shownItems().length === 0) {
+          <p class="py-12 text-center text-sm text-slate-600">{{ items().length === 0 ? 'No items yet.' : 'No items match.' }}</p>
+        } @else {
+          <div class="relative mt-4 overflow-x-auto">
+            <!-- Phones and tablets: one column, each item a small card (rooms, stock, status and buttons
+                 under its name). Wide screens (lg, 1024px): the full table. -->
+            <table class="w-full text-left text-sm lg:min-w-[46rem]">
+              <thead class="border-b border-slate-200/80 text-xs uppercase tracking-wider text-slate-500">
+                <tr>
+                  <th scope="col" class="px-3 py-3 font-semibold">Item</th>
+                  <th scope="col" class="hidden px-3 py-3 font-semibold lg:table-cell">Where</th>
+                  <th scope="col" class="hidden px-3 py-3 text-right font-semibold lg:table-cell">In stock</th>
+                  <th scope="col" class="hidden px-3 py-3 font-semibold lg:table-cell">Status</th>
+                  <th scope="col" class="hidden px-3 py-3 text-right font-semibold lg:table-cell">Actions</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-200/60">
+                @for (item of shownItems(); track item.id) {
+                  <tr class="align-top hover:bg-white/40" [class.opacity-60]="item.archived">
+                    <td class="px-3 py-3">
+                      <p class="font-medium text-slate-900">{{ item.name }}</p>
+                      <p class="text-slate-500">{{ item.categoryName }}@if (item.manufacturer || item.model) { · {{ item.manufacturer }} {{ item.model }} }</p>
+                      @for (detail of item.attributes | keyvalue; track detail.key) { <span class="mr-2 text-xs text-slate-500">{{ detail.key }}: {{ detail.value }}</span> }
+                      <div class="mt-2 space-y-2 lg:hidden">
+                        <div class="flex flex-wrap gap-1">
+                          @for (s of item.stock; track s.locationId) { <span class="badge bg-white/70 font-medium text-slate-700">{{ s.label }}: {{ s.quantity }}</span> }
+                        </div>
+                        <p class="flex flex-wrap items-center gap-2 text-slate-700">
+                          <span><span class="font-semibold text-slate-900">{{ item.onHand }}</span> in stock@if (item.reserved > 0) { · {{ item.available }} available }</span>
+                          <ng-container *ngTemplateOutlet="itemStatus; context: { $implicit: item }" />
+                        </p>
+                        <ng-container *ngTemplateOutlet="itemActions; context: { $implicit: item }" />
+                      </div>
+                    </td>
+                    <td class="hidden px-3 py-3 lg:table-cell">
+                      <div class="flex flex-wrap gap-1">
+                        @for (s of item.stock; track s.locationId) { <span class="badge bg-white/70 font-medium text-slate-700">{{ s.label }}: {{ s.quantity }}</span> }
+                        @if (item.stock.length === 0) { <span class="text-slate-400">—</span> }
+                      </div>
+                    </td>
+                    <td class="hidden px-3 py-3 text-right lg:table-cell">
+                      <span class="text-base font-semibold text-slate-900">{{ item.onHand }}</span>
+                      @if (item.reserved > 0) { <p class="text-xs text-slate-500">{{ item.available }} available</p> }
+                    </td>
+                    <td class="hidden px-3 py-3 lg:table-cell"><ng-container *ngTemplateOutlet="itemStatus; context: { $implicit: item }" /></td>
+                    <td class="hidden px-3 py-3 lg:table-cell">
+                      <div class="flex justify-end"><ng-container *ngTemplateOutlet="itemActions; context: { $implicit: item }" /></div>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      }
+
+      <!-- ========== Rooms ========== -->
+      @case ('rooms') {
+        @if (locations().length === 0) {
+          <p class="py-12 text-center text-sm text-slate-600">No storage rooms yet. Add each room where stock is kept.</p>
+        } @else {
+          <div class="relative overflow-x-auto">
+            <!-- Phones: the description goes under the room's name -->
+            <table class="w-full text-left text-sm sm:min-w-[32rem]">
+              <thead class="border-b border-slate-200/80 text-xs uppercase tracking-wider text-slate-500">
+                <tr>
+                  <th scope="col" class="px-3 py-3 font-semibold">Room</th>
+                  <th scope="col" class="hidden px-3 py-3 font-semibold sm:table-cell">Description</th>
+                  <th scope="col" class="px-3 py-3 text-right font-semibold">Units stored</th>
+                  <th scope="col" class="px-3 py-3 text-right font-semibold">Actions</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-200/60">
+                @for (room of locations(); track room.id) {
+                  <tr class="hover:bg-white/40">
+                    <td class="px-3 py-3 font-medium text-slate-900">{{ room.label }}
+                      @if (room.description) { <span class="block text-xs font-normal text-slate-500 sm:hidden">{{ room.description }}</span> }
+                    </td>
+                    <td class="hidden px-3 py-3 text-slate-600 sm:table-cell">{{ room.description || '—' }}</td>
+                    <td class="px-3 py-3 text-right text-slate-700">{{ room.unitsStored }}</td>
+                    <td class="px-3 py-3">
+                      <div class="flex justify-end gap-0.5">
+                        <button type="button" class="icon-button" [attr.aria-label]="'Edit ' + room.label" title="Edit" (click)="openRoom(room)">
+                          <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
+                        </button>
+                        <span class="inline-flex" [title]="room.hasHistory ? 'Has stock history, so it can’t be deleted.' : 'Delete'">
+                        <button type="button" class="icon-button hover:text-rose-800 disabled:opacity-40" [attr.aria-label]="'Delete ' + room.label + (room.hasHistory ? ' (not possible: it has stock history)' : '')" [disabled]="busyId() === room.id || room.hasHistory" (click)="deleteRoom(room)">
+                          <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /></svg>
+                        </button>
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      }
+
+      <!-- ========== Categories ========== -->
+      @case ('categories') {
+        <!-- Adding a category happens right here; renaming still opens the side panel -->
+        <form class="flex flex-wrap items-start gap-2 px-3 pb-3 pt-1" (ngSubmit)="addCategoryInline()">
+          <label for="new-category" class="sr-only">New category name</label>
+          <input id="new-category" name="newCategory" [(ngModel)]="newCategory" (ngModelChange)="newCategoryError.set(null)" maxlength="100" placeholder="New category, e.g. Docking stations" class="glass-input min-w-0 flex-1 rounded-xl px-3 py-2 text-sm" />
+          <button type="submit" class="btn submit-button text-white" [disabled]="addingCategory() || !newCategory.trim()">{{ addingCategory() ? 'Adding…' : 'Add' }}</button>
+          @if (newCategoryError()) { <p role="alert" class="w-full text-sm text-rose-800">{{ newCategoryError() }}</p> }
+        </form>
+        @if (categories().length === 0) {
+          <p class="py-12 text-center text-sm text-slate-600">No categories yet. Start with the kinds of things you stock: Laptops, Monitors, Keyboards, Cables…</p>
+        } @else {
+          <ul class="divide-y divide-slate-200/60">
+            @for (category of categories(); track category.id) {
+              <li class="flex items-center justify-between gap-3 px-3 py-3">
+                <div>
+                  <p class="font-medium text-slate-900">{{ category.name }}</p>
+                  <p class="text-sm text-slate-500">{{ category.itemCount }} item{{ category.itemCount === 1 ? '' : 's' }}</p>
+                </div>
+                <div class="flex gap-0.5">
+                  <button type="button" class="icon-button" [attr.aria-label]="'Rename ' + category.name" title="Rename" (click)="openCategory(category)">
+                    <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
+                  </button>
+                  <span class="inline-flex" [title]="category.itemCount > 0 ? 'Has ' + category.itemCount + (category.itemCount === 1 ? ' item' : ' items') + ': move or delete them first.' : 'Delete'">
+                  <button type="button" class="icon-button hover:text-rose-800 disabled:opacity-40" [attr.aria-label]="'Delete ' + category.name + (category.itemCount > 0 ? ' (not possible: it still has items)' : '')" [disabled]="busyId() === category.id || category.itemCount > 0" (click)="deleteCategory(category)">
+                    <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /></svg>
+                  </button>
+                  </span>
+                </div>
+              </li>
+            }
+          </ul>
+        }
+      }
+
+      <!-- ========== History ========== -->
+      @case ('history') {
+        @if (history().length === 0) {
+          <p class="py-12 text-center text-sm text-slate-600">No stock changes yet.</p>
+        } @else {
+          <ng-container *ngTemplateOutlet="transactionList; context: { $implicit: history(), showItem: true }" />
+        }
+      }
+    }
+  }
+</section>
+
+<ng-template #transactionList let-rows let-showItem="showItem">
+  <ul class="divide-y divide-slate-200/60">
+    @for (t of rows; track t.id) {
+      <li class="flex items-start justify-between gap-4 py-3">
+        <div class="min-w-0">
+          <p class="text-sm text-slate-900">
+            @if (showItem) { <span class="font-medium">{{ t.itemName }}</span> · }
+            {{ reasonLabel(t.reason) }} · {{ t.locationLabel }}
+          </p>
+          <p class="text-xs text-slate-500">{{ t.occurredAt | date: 'MMM d, y, h:mm a' }}@if (t.byName) { · {{ t.byName }} }</p>
+          @if (t.note) { <p class="mt-1 text-sm text-slate-600">“{{ t.note }}”</p> }
+        </div>
+        <span class="shrink-0 text-sm font-semibold" [class.text-teal-800]="t.delta > 0" [class.text-rose-800]="t.delta < 0">{{ t.delta > 0 ? '+' : '' }}{{ t.delta }}</span>
+      </li>
+    }
+  </ul>
+</ng-template>
+
+<!-- ========== Side panels ========== -->
+
+<app-side-panel [open]="itemPanelOpen()" [title]="editingItem() ? 'Edit ' + editingItem()!.name : 'Add an item'" (closed)="itemPanelOpen.set(false)">
+  @if (itemPanelOpen()) {
+    <form #itemForm="ngForm" (input)="formError.set(null)" (change)="formError.set(null)" (ngSubmit)="saveItem(itemForm)" class="space-y-5" novalidate>
+      <div>
+        <label for="item-form-category" class="field-label">Category</label>
+        <select id="item-form-category" name="categoryId" [(ngModel)]="itemDraft.categoryId" required class="glass-input w-full rounded-xl px-3 py-2.5 text-sm">
+          @for (category of categories(); track category.id) { <option [ngValue]="category.id">{{ category.name }}</option> }
+        </select>
+      </div>
+      <div>
+        <label for="item-form-name" class="field-label">Name</label>
+        <input id="item-form-name" name="name" [(ngModel)]="itemDraft.name" #itemName="ngModel" required maxlength="200" placeholder="Dell P2422H 24-inch monitor" class="glass-input w-full rounded-xl px-3 py-2.5 text-sm" [attr.aria-invalid]="itemName.invalid && (itemName.touched || itemForm.submitted)" />
+      </div>
+      <div class="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label for="item-form-maker" class="field-label">Manufacturer <span class="font-normal text-slate-500">(optional)</span></label>
+          <input id="item-form-maker" name="manufacturer" [(ngModel)]="itemDraft.manufacturer" maxlength="100" class="glass-input w-full rounded-xl px-3 py-2.5 text-sm" />
+        </div>
+        <div>
+          <label for="item-form-model" class="field-label">Model <span class="font-normal text-slate-500">(optional)</span></label>
+          <input id="item-form-model" name="model" [(ngModel)]="itemDraft.model" maxlength="100" class="glass-input w-full rounded-xl px-3 py-2.5 text-sm" />
+        </div>
+      </div>
+      <div>
+        <label for="item-form-threshold" class="field-label">Low stock at or below</label>
+        <input id="item-form-threshold" name="lowStockThreshold" type="number" [(ngModel)]="itemDraft.lowStockThreshold" #threshold="ngModel" required min="0" max="100000" class="glass-input w-32 rounded-xl px-3 py-2.5 text-sm" [attr.aria-invalid]="threshold.invalid && (threshold.touched || itemForm.submitted)" />
+        <p class="mt-1 text-xs text-slate-500">Counted across all rooms together. Low items show on the dashboard and in the daily email.</p>
+      </div>
+      <fieldset>
+        <legend class="field-label">Extra details <span class="font-normal text-slate-500">(optional, e.g. Size: 24 in)</span></legend>
+        <div class="space-y-2">
+          @for (row of attributeRows; track $index) {
+            <div class="flex gap-2">
+              <input [name]="'attr-key-' + $index" [(ngModel)]="row.key" placeholder="Name" maxlength="50" aria-label="Detail name" class="glass-input w-2/5 rounded-xl px-3 py-2 text-sm" />
+              <input [name]="'attr-value-' + $index" [(ngModel)]="row.value" placeholder="Value" maxlength="200" aria-label="Detail value" class="glass-input min-w-0 flex-1 rounded-xl px-3 py-2 text-sm" />
+              <button type="button" class="icon-button" aria-label="Remove this detail" (click)="removeAttributeRow(row)">✕</button>
+            </div>
+          }
+        </div>
+        <button type="button" class="mt-2 text-sm font-medium text-teal-900 hover:underline" (click)="addAttributeRow()">+ Add a detail</button>
+      </fieldset>
+      @if (!editingItem()) {
+        <fieldset>
+          <legend class="field-label">Starting stock <span class="font-normal text-slate-500">(optional)</span></legend>
+          <div class="flex flex-wrap items-center gap-2">
+            <label class="sr-only" for="item-form-start-qty">How many</label>
+            <input id="item-form-start-qty" name="startingQuantity" type="number" min="0" max="100000" placeholder="0" [(ngModel)]="itemDraft.startingQuantity" class="glass-input w-24 rounded-xl px-3 py-2.5 text-sm" />
+            <span class="text-sm text-slate-600">in</span>
+            <label class="sr-only" for="item-form-start-room">Room</label>
+            <select id="item-form-start-room" name="startingLocationId" [(ngModel)]="itemDraft.startingLocationId" class="glass-input min-w-0 flex-1 rounded-xl px-3 py-2.5 text-sm">
+              @for (room of locations(); track room.id) { <option [ngValue]="room.id">{{ room.label }}</option> }
+            </select>
+          </div>
+          <p class="mt-1 text-xs text-slate-500">Saved as “Starting stock” in its history. Leave empty to add stock later.</p>
+        </fieldset>
+      }
+      @if (itemForm.invalid && itemForm.submitted) { <p class="text-sm text-rose-800">Please choose a category, give the item a name, and a threshold of 0 or more.</p> }
+      @if (formError()) { <p role="alert" class="rounded-2xl bg-rose-50/90 px-4 py-3 text-sm text-rose-900">{{ formError() }}</p> }
+      <div class="flex justify-end gap-2 pt-2">
+        <button type="button" class="btn btn-quiet" (click)="itemPanelOpen.set(false)">Cancel</button>
+        <button type="submit" class="btn submit-button text-white" [disabled]="saving()">{{ saving() ? 'Saving…' : (editingItem() ? 'Save changes' : 'Add item') }}</button>
+      </div>
+    </form>
+  }
+</app-side-panel>
+
+<app-side-panel [open]="!!stockItem()" [title]="'Adjust stock: ' + (stockItem()?.name ?? '')" (closed)="stockItem.set(null)">
+  @if (stockItem(); as item) {
+    <form #stockForm="ngForm" (input)="formError.set(null)" (change)="formError.set(null)" (ngSubmit)="saveStock(stockForm)" class="space-y-5" novalidate>
+      <div>
+        <label for="stock-room" class="field-label">{{ stockDraft.type === 'MOVE' ? 'From room' : 'Room' }}</label>
+        <select id="stock-room" name="locationId" [(ngModel)]="stockDraft.locationId" required class="glass-input w-full rounded-xl px-3 py-2.5 text-sm">
+          @for (room of locations(); track room.id) { <option [ngValue]="room.id">{{ room.label }}</option> }
+        </select>
+        <p class="mt-1 text-xs text-slate-500">Currently {{ stockInRoom() }} here, {{ item.onHand }} in total.</p>
+      </div>
+      <fieldset>
+        <legend class="field-label">What happened?</legend>
+        <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          @for (option of [{ id: 'ADD', label: 'Add' }, { id: 'REMOVE', label: 'Remove' }, { id: 'SET', label: 'Set count' }, { id: 'MOVE', label: 'Move to room' }]; track option.id) {
+            <label class="flex cursor-pointer items-center justify-center rounded-xl border px-3 py-2 text-sm font-medium" [class]="stockDraft.type === option.id ? 'border-teal-700 bg-teal-50 text-teal-950' : 'border-white/80 bg-white/50 text-slate-700'">
+              <input type="radio" name="type" class="sr-only" [value]="option.id" [(ngModel)]="stockDraft.type" />{{ option.label }}
+            </label>
+          }
+        </div>
+      </fieldset>
+      @if (stockDraft.type === 'MOVE') {
+        <div>
+          <label for="stock-to-room" class="field-label">To room</label>
+          <select id="stock-to-room" name="toLocationId" [(ngModel)]="stockDraft.toLocationId" class="glass-input w-full rounded-xl px-3 py-2.5 text-sm">
+            <option [ngValue]="null" disabled>Choose a room</option>
+            @for (room of locations(); track room.id) { @if (room.id !== stockDraft.locationId) { <option [ngValue]="room.id">{{ room.label }}</option> } }
+          </select>
+        </div>
+      }
+      <div>
+        <label for="stock-quantity" class="field-label">{{ stockDraft.type === 'SET' ? 'Count in the room now' : 'How many' }}</label>
+        <input id="stock-quantity" name="quantity" type="number" [(ngModel)]="stockDraft.quantity" #quantity="ngModel" required min="0" max="100000" class="glass-input w-32 rounded-xl px-3 py-2.5 text-sm" [attr.aria-invalid]="quantity.invalid && (quantity.touched || stockForm.submitted)" />
+      </div>
+      <div>
+        <label for="stock-note" class="field-label">Note <span class="font-normal text-slate-500">(optional)</span></label>
+        <input id="stock-note" name="note" [(ngModel)]="stockDraft.note" maxlength="500" [placeholder]="stockDraft.type === 'ADD' ? 'Delivery from CDW' : stockDraft.type === 'REMOVE' ? 'Broken, recycled' : stockDraft.type === 'MOVE' ? 'For the Fenn Tower refresh' : 'Counted on shelf'" class="glass-input w-full rounded-xl px-3 py-2.5 text-sm" />
+      </div>
+      <p class="rounded-2xl bg-white/60 px-4 py-3 text-sm text-slate-700" aria-live="polite">
+        @if (stockAfter() !== null) {
+          {{ locationLabel(stockDraft.locationId) }}: <span class="font-semibold">{{ stockInRoom() }}</span> → <span class="font-semibold text-teal-900">{{ stockAfter() }}</span>
+          @if (stockDraft.type === 'MOVE') { · {{ locationLabel(stockDraft.toLocationId) }}: <span class="font-semibold text-teal-900">{{ stockInTarget() }}</span> }
+        } @else if (stockDraft.type === 'MOVE' && stockDraft.quantity !== null && (stockDraft.quantity ?? 0) <= stockInRoom()) {
+          Choose the room to move them to, and how many (more than 0).
+        } @else if (stockDraft.quantity !== null) {
+          <span class="text-rose-800">That’s more than the {{ stockInRoom() }} in this room.</span>
+        } @else {
+          Enter a number to see the result.
+        }
+      </p>
+      @if (formError()) { <p role="alert" class="rounded-2xl bg-rose-50/90 px-4 py-3 text-sm text-rose-900">{{ formError() }}</p> }
+      <div class="flex justify-end gap-2 pt-2">
+        <button type="button" class="btn btn-quiet" (click)="stockItem.set(null)">Cancel</button>
+        <button type="submit" class="btn submit-button text-white" [disabled]="saving() || stockAfter() === null">{{ saving() ? 'Saving…' : 'Save' }}</button>
+      </div>
+    </form>
+  }
+</app-side-panel>
+
+<app-side-panel [open]="!!historyItem()" [title]="'History: ' + (historyItem()?.name ?? '')" (closed)="historyItem.set(null)">
+  @if (historyItem()) {
+    @if (itemHistory().length === 0) {
+      <p class="text-sm text-slate-600">No stock changes yet.</p>
+    } @else {
+      <ng-container *ngTemplateOutlet="transactionList; context: { $implicit: itemHistory(), showItem: false }" />
+    }
+  }
+</app-side-panel>
+
+<app-side-panel [open]="roomPanelOpen()" [title]="editingRoom() ? 'Edit ' + editingRoom()!.label : 'Add a storage room'" (closed)="roomPanelOpen.set(false)">
+  @if (roomPanelOpen()) {
+    <form #roomForm="ngForm" (input)="formError.set(null)" (change)="formError.set(null)" (ngSubmit)="saveRoom(roomForm)" class="space-y-5" novalidate>
+      <div class="grid gap-4 sm:grid-cols-[2fr_1fr]">
+        <div>
+          <label for="room-building" class="field-label">Building</label>
+          <input id="room-building" name="building" [(ngModel)]="roomDraft.building" #building="ngModel" required maxlength="100" placeholder="Rhodes Tower" class="glass-input w-full rounded-xl px-3 py-2.5 text-sm" [attr.aria-invalid]="building.invalid && (building.touched || roomForm.submitted)" />
+        </div>
+        <div>
+          <label for="room-room" class="field-label">Room</label>
+          <input id="room-room" name="room" [(ngModel)]="roomDraft.room" #roomNumber="ngModel" required maxlength="50" placeholder="1408" class="glass-input w-full rounded-xl px-3 py-2.5 text-sm" [attr.aria-invalid]="roomNumber.invalid && (roomNumber.touched || roomForm.submitted)" />
+        </div>
+      </div>
+      <div>
+        <label for="room-description" class="field-label">Description <span class="font-normal text-slate-500">(optional)</span></label>
+        <input id="room-description" name="description" [(ngModel)]="roomDraft.description" maxlength="255" placeholder="Back room behind the help desk" class="glass-input w-full rounded-xl px-3 py-2.5 text-sm" />
+      </div>
+      @if (roomForm.invalid && roomForm.submitted) { <p class="text-sm text-rose-800">Please fill in the building and room.</p> }
+      @if (formError()) { <p role="alert" class="rounded-2xl bg-rose-50/90 px-4 py-3 text-sm text-rose-900">{{ formError() }}</p> }
+      <div class="flex justify-end gap-2 pt-2">
+        <button type="button" class="btn btn-quiet" (click)="roomPanelOpen.set(false)">Cancel</button>
+        <button type="submit" class="btn submit-button text-white" [disabled]="saving()">{{ saving() ? 'Saving…' : (editingRoom() ? 'Save changes' : 'Add room') }}</button>
+      </div>
+    </form>
+  }
+</app-side-panel>
+
+<app-side-panel [open]="categoryPanelOpen()" [title]="editingCategory() ? 'Rename ' + editingCategory()!.name : 'Add a category'" (closed)="categoryPanelOpen.set(false)">
+  @if (categoryPanelOpen()) {
+    <form #categoryForm="ngForm" (input)="formError.set(null)" (change)="formError.set(null)" (ngSubmit)="saveCategory(categoryForm)" class="space-y-5" novalidate>
+      <div>
+        <label for="category-name" class="field-label">Name</label>
+        <input id="category-name" name="name" [(ngModel)]="categoryDraft" #categoryName="ngModel" required maxlength="100" placeholder="Monitors" class="glass-input w-full rounded-xl px-3 py-2.5 text-sm" [attr.aria-invalid]="categoryName.invalid && (categoryName.touched || categoryForm.submitted)" />
+      </div>
+      @if (formError()) { <p role="alert" class="rounded-2xl bg-rose-50/90 px-4 py-3 text-sm text-rose-900">{{ formError() }}</p> }
+      <div class="flex justify-end gap-2 pt-2">
+        <button type="button" class="btn btn-quiet" (click)="categoryPanelOpen.set(false)">Cancel</button>
+        <button type="submit" class="btn submit-button text-white" [disabled]="saving()">{{ saving() ? 'Saving…' : (editingCategory() ? 'Rename' : 'Add category') }}</button>
+      </div>
+    </form>
+  }
+</app-side-panel>
+
+<!-- An item's status badge and buttons: in the table on wide screens, under the item's name on phones and tablets -->
+<ng-template #itemStatus let-item>
+  @if (item.archived) { <span class="badge bg-slate-200 text-slate-700">Archived</span> }
+  @else if (item.onHand === 0) { <span class="badge bg-rose-100 text-rose-900">Out of stock</span> }
+  @else if (item.lowStock) { <span class="badge bg-amber-100 text-amber-900">Low (≤ {{ item.lowStockThreshold }})</span> }
+  @else { <span class="badge bg-teal-100 text-teal-900">OK</span> }
+</ng-template>
+<ng-template #itemActions let-item>
+  <div class="flex flex-wrap items-center gap-0.5">
+    @if (!item.archived) {
+      <button type="button" class="btn btn-quiet px-3 py-1.5 text-xs" [disabled]="locations().length === 0" (click)="openStock(item)">Adjust stock</button>
+    }
+    <button type="button" class="icon-button" [attr.aria-label]="'History of ' + item.name" title="History" (click)="openHistory(item)">
+      <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5M12 7v5l3 2" /></svg>
+    </button>
+    <button type="button" class="icon-button" [attr.aria-label]="'Edit ' + item.name" title="Edit" (click)="openEditItem(item)">
+      <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
+    </button>
+    <button type="button" class="icon-button" [attr.aria-label]="(item.archived ? 'Restore ' : 'Archive ') + item.name" [title]="item.archived ? 'Restore' : 'Archive'" [disabled]="busyId() === item.id" (click)="archiveItem(item)">
+      <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4" /></svg>
+    </button>
+    <!-- Greyed out with the reason when it can't work (a disabled button shows no tooltip, so the span carries it) -->
+    <span class="inline-flex" [title]="item.hasHistory ? 'Has stock or task history, so it can’t be deleted. Archive it instead.' : 'Delete'">
+    <button type="button" class="icon-button hover:text-rose-800 disabled:opacity-40" [attr.aria-label]="'Delete ' + item.name + (item.hasHistory ? ' (not possible: it has history; archive it instead)' : '')" [disabled]="busyId() === item.id || item.hasHistory" (click)="deleteItem(item)">
+      <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /></svg>
+    </button>
+    </span>
+  </div>
+</ng-template>

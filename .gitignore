@@ -1,0 +1,5 @@
+.DS_Store
+
+# Test copy made by scripts/test-data/start.sh: database, logs and made-up passwords
+scripts/test-data/.state/
+__pycache__/

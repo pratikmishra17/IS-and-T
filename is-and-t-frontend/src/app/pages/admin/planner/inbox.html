@@ -1,0 +1,15 @@
+@if (requests().length === 0) {
+  <p class="py-12 text-center text-sm text-slate-600">No requests waiting. Students submit their hours from their Schedule page.</p>
+} @else {
+  <ul class="divide-y divide-slate-200/60">
+    @for (request of requests(); track request.id) {
+      <li class="flex flex-wrap items-center justify-between gap-3 py-3">
+        <div>
+          <p class="font-medium text-slate-900">{{ request.studentName }}</p>
+          <p class="text-sm text-slate-500">{{ request.semesterName }} · submitted {{ request.submittedAt | date: 'MMM d, h:mm a' }}</p>
+        </div>
+        <button type="button" class="btn submit-button text-white" (click)="review.emit(request)">Review</button>
+      </li>
+    }
+  </ul>
+}

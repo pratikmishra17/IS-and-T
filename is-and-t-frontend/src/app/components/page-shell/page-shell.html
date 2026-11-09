@@ -1,7 +1,8 @@
 <div class="glass-page relative isolate flex min-h-svh flex-col overflow-x-clip px-4 py-5 sm:px-8">
   <ng-content select="app-navbar" />
-  <main class="relative flex flex-1 items-center justify-center py-10 sm:py-14">
-    <div class="w-full max-w-lg">
+  <main class="relative flex flex-1 items-center justify-center pb-28 pt-8 sm:py-14">
+    <!-- Pages read best in a narrow column; a page marked page-wide (the Team board) gets the full width -->
+    <div class="w-full max-w-3xl has-[>.page-wide]:max-w-7xl">
       <ng-content />
     </div>
   </main>

@@ -1,0 +1,43 @@
+# The team's weekly Tech Room shifts, copied from the "Fall 25" schedule sheet (effective Aug 26).
+# Loaded on startup in the dev profile by DevShiftImport: each student listed here who has no
+# weekly shifts yet in the current semester gets these. Students who already have shifts are left
+# alone, so changes made in the admin portal are never overwritten.
+#
+# student, day, start, end
+# The student is a first name, plus a last-name initial when two people could share it ("Adam C").
+# In the sheet the last blue cell is the end time: blue from the 9 cell to the 12 cell is 9:00–12:00,
+# which is how the sheet's own "hours" column adds up.
+
+Hetvi,MONDAY,08:30,13:30
+Hetvi,WEDNESDAY,08:30,13:30
+Hetvi,FRIDAY,09:00,17:00
+
+Alister,MONDAY,09:00,12:00
+Alister,THURSDAY,09:00,17:30
+Alister,FRIDAY,09:00,17:30
+
+Pratik,MONDAY,09:30,11:30
+Pratik,MONDAY,12:30,17:00
+Pratik,TUESDAY,13:00,17:00
+Pratik,WEDNESDAY,09:00,11:00
+
+Grace,MONDAY,13:30,18:00
+Grace,TUESDAY,13:30,16:00
+Grace,WEDNESDAY,13:30,18:00
+Grace,THURSDAY,13:30,16:00
+Grace,FRIDAY,10:00,16:00
+
+Alex,MONDAY,09:00,12:30
+Alex,TUESDAY,14:30,16:30
+Alex,WEDNESDAY,12:00,15:00
+Alex,FRIDAY,09:00,17:00
+
+Oskar,MONDAY,14:30,17:00
+Oskar,TUESDAY,12:00,17:00
+Oskar,WEDNESDAY,14:30,17:00
+Oskar,THURSDAY,12:00,17:00
+Oskar,FRIDAY,14:30,17:00
+
+Adam C,MONDAY,12:00,16:00
+Adam C,THURSDAY,08:00,12:30
+Adam C,THURSDAY,13:30,16:00

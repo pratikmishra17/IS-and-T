@@ -1,0 +1,90 @@
+/* ---------------------------------------------------------------------------------------------
+   Colours per theme and portal. GENERATED from Tailwind's palette by a one-off script; the idea:
+   - Pages only use five colour families (slate, white, teal, rose, amber). Dark mode redefines
+     them, so the same classes work in both themes without dark: variants on every element:
+     text-slate-900 (near black) becomes near white, bg-rose-50 (pale) becomes deep rose, and so on.
+   - The admin portal redefines teal as indigo, so everything accented there (buttons, links,
+     badges, focus rings) is indigo, and the two portals are easy to tell apart.
+   --------------------------------------------------------------------------------------------- */
+
+:root[data-theme='dark'] {
+  --color-slate-50: oklch(12.9% 0.042 264.695);
+  --color-slate-100: oklch(20.8% 0.042 265.755);
+  --color-slate-200: oklch(27.9% 0.041 260.031);
+  --color-slate-300: oklch(37.2% 0.044 257.287);
+  --color-slate-400: oklch(55.4% 0.046 257.417);
+  --color-slate-500: oklch(70.4% 0.04 256.788);
+  --color-slate-600: oklch(86.9% 0.022 252.894);
+  --color-slate-700: oklch(92.9% 0.013 255.508);
+  --color-slate-800: oklch(96.8% 0.007 247.896);
+  --color-slate-900: oklch(98.4% 0.003 247.858);
+  --color-slate-950: oklch(98.4% 0.003 247.858);
+  --color-teal-50: oklch(27.7% 0.046 192.524);
+  --color-teal-100: oklch(38.6% 0.063 188.416);
+  --color-teal-200: oklch(43.7% 0.078 188.216);
+  --color-teal-300: oklch(51.1% 0.096 186.391);
+  --color-teal-400: oklch(60% 0.118 184.704);
+  --color-teal-500: oklch(70.4% 0.14 182.503);
+  --color-teal-600: oklch(77.7% 0.152 181.912);
+  --color-teal-700: oklch(85.5% 0.138 181.071);
+  --color-teal-800: oklch(91% 0.096 180.426);
+  --color-teal-900: oklch(95.3% 0.051 180.801);
+  --color-teal-950: oklch(98.4% 0.014 180.72);
+  --color-rose-50: oklch(27.1% 0.105 12.094);
+  --color-rose-100: oklch(41% 0.159 10.272);
+  --color-rose-200: oklch(45.5% 0.188 13.697);
+  --color-rose-300: oklch(51.4% 0.222 16.935);
+  --color-rose-400: oklch(58.6% 0.253 17.585);
+  --color-rose-500: oklch(64.5% 0.246 16.439);
+  --color-rose-600: oklch(71.2% 0.194 13.428);
+  --color-rose-700: oklch(81% 0.117 11.638);
+  --color-rose-800: oklch(89.2% 0.058 10.001);
+  --color-rose-900: oklch(94.1% 0.03 12.58);
+  --color-rose-950: oklch(96.9% 0.015 12.422);
+  --color-amber-50: oklch(27.9% 0.077 45.635);
+  --color-amber-100: oklch(41.4% 0.112 45.904);
+  --color-amber-200: oklch(47.3% 0.137 46.201);
+  --color-amber-300: oklch(55.5% 0.163 48.998);
+  --color-amber-400: oklch(66.6% 0.179 58.318);
+  --color-amber-500: oklch(76.9% 0.188 70.08);
+  --color-amber-600: oklch(82.8% 0.189 84.429);
+  --color-amber-700: oklch(87.9% 0.169 91.605);
+  --color-amber-800: oklch(92.4% 0.12 95.746);
+  --color-amber-900: oklch(96.2% 0.059 95.617);
+  --color-amber-950: oklch(98.7% 0.022 95.277);
+  /* "white" surfaces (bg-white/60 and the like) become a raised dark glass */
+  --color-white: oklch(33% 0.03 262);
+}
+
+:root[data-portal='admin'] {
+  --color-teal-50: oklch(96.2% 0.018 272.314);
+  --color-teal-100: oklch(93% 0.034 272.788);
+  --color-teal-200: oklch(87% 0.065 274.039);
+  --color-teal-300: oklch(78.5% 0.115 274.713);
+  --color-teal-400: oklch(67.3% 0.182 276.935);
+  --color-teal-500: oklch(58.5% 0.233 277.117);
+  --color-teal-600: oklch(51.1% 0.262 276.966);
+  --color-teal-700: oklch(45.7% 0.24 277.023);
+  --color-teal-800: oklch(39.8% 0.195 277.366);
+  --color-teal-900: oklch(35.9% 0.144 278.697);
+  --color-teal-950: oklch(25.7% 0.09 281.288);
+}
+
+:root[data-portal='admin'][data-theme='dark'] {
+  --color-teal-50: oklch(25.7% 0.09 281.288);
+  --color-teal-100: oklch(35.9% 0.144 278.697);
+  --color-teal-200: oklch(39.8% 0.195 277.366);
+  --color-teal-300: oklch(45.7% 0.24 277.023);
+  --color-teal-400: oklch(51.1% 0.262 276.966);
+  --color-teal-500: oklch(58.5% 0.233 277.117);
+  --color-teal-600: oklch(67.3% 0.182 276.935);
+  --color-teal-700: oklch(78.5% 0.115 274.713);
+  --color-teal-800: oklch(87% 0.065 274.039);
+  --color-teal-900: oklch(93% 0.034 272.788);
+  --color-teal-950: oklch(96.2% 0.018 272.314);
+}
+
+/* White text stays white in dark mode (it sits on coloured buttons and badges) */
+:root[data-theme='dark'] .text-white {
+  color: #fff;
+}
